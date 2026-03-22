@@ -13,6 +13,14 @@ const pool = mysql.createPool({
   charset:            'utf8mb4',
 });
 
+console.log('Connecting to MySQL with:', {
+  host: pool.config.connectionConfig.host,
+  port: pool.config.connectionConfig.port,
+  user: pool.config.connectionConfig.user,
+  password: pool.config.connectionConfig.password ? '***' : '(empty)',
+  database: pool.config.connectionConfig.database
+});
+
 // READ queries — use text protocol (pool.query) to avoid prepared-statement
 // type-binding failures with COALESCE(SUM(decimal),0) and other aggregates.
 async function query(sql, params = []) {
