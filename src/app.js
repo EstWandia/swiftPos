@@ -12,6 +12,9 @@ const { requireAuth } = require('./middlewares/authMiddleware');
 
 const app = express();
 
+// ── Trust proxy (important for HTTPS behind Railway) ────────────────
+app.set('trust proxy', 1);  // <--- ADD THIS BEFORE app.use(session)
+
 // ── Security headers ──────────────────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
 
