@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SwiftPOS — Orders</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+body{display:flex;flex-direction:column;height:100%;overflow:hidden}
+.page-body{flex:1;overflow-y:auto;padding:16px 16px 80px}
+.sum-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.sc{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.sc-lbl{font-size:10px;color:var(--t2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.sc-val{font-size:22px;font-weight:800;font-family:var(--mono)}
+.sc-val.g{color:var(--green)}.sc-val.b{color:var(--a)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.fi{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-family:var(--font);font-size:12px;padding:7px 10px;outline:none}
+.fi:focus{border-color:var(--a)}
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+td{font-size:13px;padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:var(--s2)}
+tr.clickable{cursor:pointer}
+.s-completed{color:var(--green);background:rgba(31,209,133,.1);border:1px solid rgba(31,209,133,.25)}
+.s-cancelled{color:var(--red);background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.25)}
+.s-hold{color:var(--amber);background:rgba(255,179,71,.1);border:1px solid rgba(255,179,71,.25)}
+.s-refunded{color:var(--t2);background:var(--s3);border:1px solid var(--border)}
+.s-pending{color:var(--a);background:rgba(61,139,255,.1);border:1px solid rgba(61,139,255,.25)}
+/* Detail drawer */
+.det-ov{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(5px);z-index:500;opacity:0;pointer-events:none;transition:opacity .25s}
+.det-ov.open{opacity:1;pointer-events:all}
+.det-dr{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:480px;background:var(--s1);border-left:1px solid var(--border2);z-index:600;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,1,.35,1)}
+.det-dr.open{transform:translateX(0)}
+.dh{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border)}
+.db{flex:1;overflow-y:auto;padding:16px 18px}
+.ds{margin-bottom:18px}
+.ds h4{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+.di-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:6px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ic{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px}
+.ic-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.ic-v{font-size:13px;font-weight:600}
+.tl-box{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.tl-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.tl-row .l{color:var(--t2)}
+.tl-row.gt{border-top:1px solid var(--border);margin-top:6px;padding-top:10px}
+.tl-row.gt .l{font-size:15px;font-weight:800;color:var(--text)}
+.tl-row.gt .v{font-size:18px;font-weight:800;color:var(--a);font-family:var(--mono)}
+.pg{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:16px;padding:10px 0}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <span class="logo" id="bizName">⚡ SwiftPOS</span>
+  <nav class="nav-links" id="navLinks"></nav>
+  <div class="topbar-right">
+    <div class="avatar" id="userAvatar" onclick="window.location='/auth/logout'" title="Sign out"></div>
+  </div>
+</header>
+
+<div class="page-body">
+  <h2 style="font-size:18px;margin-bottom:14px">📋 Orders</h2>
+  <div class="sum-grid">
+    <div class="sc"><div class="sc-lbl">Orders Today</div><div class="sc-val b" id="sumCount">—</div></div>
+    <div class="sc"><div class="sc-lbl">Revenue Today</div><div class="sc-val g" id="sumRev">—</div></div>
+    <div class="sc"><div class="sc-lbl">Avg. Order</div><div class="sc-val" id="sumAvg">—</div></div>
+    <div class="sc"><div class="sc-lbl">Tax Collected</div><div class="sc-val" id="sumTax">—</div></div>
+  </div>
+  <div class="filters">
+    <select class="fi" id="fStatus" onchange="applyFilters()">
+      <option value="">All Statuses</option>
+      <option value="completed">Completed</option>
+      <option value="pending">Pending</option>
+      <option value="hold">On Hold</option>
+      <option value="cancelled">Cancelled</option>
+      <option value="refunded">Refunded</option>
+    </select>
+    <span style="font-size:12px;color:var(--t2)">From</span>
+    <input class="fi" type="date" id="fFrom" onchange="applyFilters()">
+    <span style="font-size:12px;color:var(--t2)">To</span>
+    <input class="fi" type="date" id="fTo"   onchange="applyFilters()">
+    <button class="btn btn-ghost" onclick="clearFilters()">Clear</button>
+    <button class="btn btn-primary ml-auto" onclick="location.href='/'">+ New Order</button>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>#</th><th>Order No.</th><th>Date/Time</th><th>Customer</th><th>Items</th><th>Payment</th><th>Total</th><th>Status</th></tr></thead>
+      <tbody id="ordersBody"></tbody>
+    </table>
+  </div>
+  <div class="pg" id="pg"></div>
+</div>
+
+<div class="statusbar"><span><span class="dot"></span>Online</span><span id="clock" class="mono ml-auto"></span></div>
+
+<!-- Detail drawer -->
+<div class="det-ov" id="detOv" onclick="closeDetail()"></div>
+<div class="det-dr" id="detDr">
+  <div class="dh">
+    <div><div style="font-size:16px;font-weight:800" id="ddNum">—</div><div style="font-size:12px;color:var(--t2)" id="ddDate">—</div></div>
+    <button class="od-close" onclick="closeDetail()">✕</button>
+  </div>
+  <div class="db" id="ddBody"></div>
+</div>
+
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script>
+let page=0,totalOrders=0,currentUser=null;
+const LIMIT=30;
+const payIco={cash:'💵',card:'💳',qr:'📱',mixed:'💰'};
+
+(async function(){
+  try{const{user}=await API.get('/api/me');currentUser=user;
+    document.getElementById('userAvatar').textContent=user.name.slice(0,2).toUpperCase();
+    document.getElementById('bizName').textContent=user.business?.name||'SwiftPOS';
+    window._currSym=user.business?.currency_sym||'€';
+    buildNav(user.role,'/orders');
+  }catch{window.location.href='/login';return;}
+  startClock('clock');
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('fFrom').value=today;
+  document.getElementById('fTo').value=today;
+  await loadSummary(today);
+  await loadOrders();
+})();
+
+async function loadSummary(d){
+  try{const{summary}=await API.get(`/api/orders/summary/today?date=${d}`);
+    document.getElementById('sumCount').textContent=summary.order_count||0;
+    document.getElementById('sumRev').textContent=fmt(summary.revenue||0);
+    document.getElementById('sumAvg').textContent=fmt(summary.avg_order_value||0);
+    document.getElementById('sumTax').textContent=fmt(summary.tax_collected||0);
+  }catch(_){}
+}
+
+async function loadOrders(){
+  const status=document.getElementById('fStatus').value;
+  const df=document.getElementById('fFrom').value;
+  const dt=document.getElementById('fTo').value;
+  let url=`/api/orders?limit=${LIMIT}&offset=${page*LIMIT}`;
+  if(status)url+=`&status=${status}`;
+  if(df)url+=`&date_from=${df}`;
+  if(dt)url+=`&date_to=${dt}`;
+  try{
+    const{rows,total}=await API.get(url);
+    totalOrders=total; renderTable(rows); renderPg();
+    if(df)loadSummary(df);
+  }catch(e){showToast(e.message,'error');}
+}
+
+function renderTable(orders){
+  document.getElementById('ordersBody').innerHTML=orders.length
+    ?orders.map((o,i)=>`<tr class="clickable" onclick="openDetail(${o.id})">
+        <td style="color:var(--t3)">${page*LIMIT+i+1}</td>
+        <td><strong class="mono">${o.order_number}</strong></td>
+        <td style="color:var(--t2);white-space:nowrap;font-size:12px">${fmtDateTime(o.created_at)}</td>
+        <td>${o.customer_name||'<span style="color:var(--t3)">Walk-in</span>'}</td>
+        <td><span class="badge badge-blue">${o.item_count} items</span></td>
+        <td>${payIco[o.payment_method]||'💰'} <span style="font-size:11px;color:var(--t2)">${o.payment_method}</span></td>
+        <td><strong class="mono">${fmt(o.total)}</strong></td>
+        <td><span class="badge s-${o.status}">${o.status}</span></td>
+      </tr>`).join('')
+    :`<tr><td colspan="8"><div class="empty-state"><div class="ei">📋</div><h3>No orders found</h3><p>Try different filters</p></div></td></tr>`;
+}
+
+function renderPg(){
+  const pages=Math.ceil(totalOrders/LIMIT);
+  if(pages<=1){document.getElementById('pg').innerHTML='';return;}
+  let h='';
+  if(page>0)h+=`<button class="btn btn-ghost" onclick="goPage(${page-1})">← Prev</button>`;
+  h+=`<span style="font-size:12px;color:var(--t2)">Page ${page+1} of ${pages} &nbsp;·&nbsp; ${totalOrders} orders</span>`;
+  if(page<pages-1)h+=`<button class="btn btn-ghost" onclick="goPage(${page+1})">Next →</button>`;
+  document.getElementById('pg').innerHTML=h;
+}
+
+function goPage(p){page=p;loadOrders();}
+function applyFilters(){page=0;loadOrders();}
+function clearFilters(){
+  document.getElementById('fStatus').value='';
+  const t=new Date().toISOString().split('T')[0];
+  document.getElementById('fFrom').value=t;document.getElementById('fTo').value=t;
+  applyFilters();
+}
+
+async function openDetail(id){
+  document.getElementById('detOv').classList.add('open');
+  document.getElementById('detDr').classList.add('open');
+  document.getElementById('ddBody').innerHTML='<div class="spinner"></div>';
+  try{
+    const{order}=await API.get(`/api/orders/${id}`);
+    document.getElementById('ddNum').textContent=order.order_number;
+    document.getElementById('ddDate').textContent=fmtDateTime(order.created_at)+' · '+order.cashier_name;
+    document.getElementById('ddBody').innerHTML=`
+      <div class="ds"><h4>Info</h4>
+        <div class="info-grid">
+          <div class="ic"><div class="ic-l">Customer</div><div class="ic-v">${order.customer_name||'Walk-in'}</div></div>
+          <div class="ic"><div class="ic-l">Payment</div><div class="ic-v">${payIco[order.payment_method]||''} ${order.payment_method}</div></div>
+          <div class="ic"><div class="ic-l">Status</div><div class="ic-v"><span class="badge s-${order.status}">${order.status}</span></div></div>
+          <div class="ic"><div class="ic-l">Cashier</div><div class="ic-v">${order.cashier_name}</div></div>
+        </div>
+      </div>
+      <div class="ds"><h4>${order.items.length} Item${order.items.length!==1?'s':''}</h4>
+        ${order.items.map(i=>`<div class="di-row">
+          <span style="font-size:20px">${i.emoji||'🛒'}</span>
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i.name}</div>
+            <div style="font-size:11px;color:var(--t2)">${i.sku} · ×${i.quantity} · ${fmt(i.price)} ea</div></div>
+          <span class="mono" style="font-size:13px;font-weight:700;color:var(--a)">${fmt(i.line_total)}</span>
+        </div>`).join('')}
+      </div>
+      <div class="ds"><h4>Totals</h4>
+        <div class="tl-box">
+          <div class="tl-row"><span class="l">Subtotal</span><span class="v mono">${fmt(order.subtotal)}</span></div>
+          <div class="tl-row"><span class="l">Tax</span><span class="v mono">${fmt(order.tax_total)}</span></div>
+          ${parseFloat(order.discount_amount)>0?`<div class="tl-row"><span class="l" style="color:var(--green)">Discount ${order.discount_code?'('+order.discount_code+')':''}</span><span class="v mono" style="color:var(--green)">-${fmt(order.discount_amount)}</span></div>`:''}
+          <div class="tl-row gt"><span class="l">Total</span><span class="v">${fmt(order.total)}</span></div>
+          ${order.amount_tendered?`<div class="tl-row"><span class="l">Tendered</span><span class="v mono">${fmt(order.amount_tendered)}</span></div>`:''}
+          ${order.change_amount!=null&&parseFloat(order.change_amount)>=0?`<div class="tl-row"><span class="l">Change</span><span class="v mono" style="color:var(--green)">${fmt(order.change_amount)}</span></div>`:''}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${order.status==='completed'?`<button class="btn btn-danger" onclick="updStatus(${order.id},'cancelled')">Cancel Order</button>`:''}
+        ${order.status==='cancelled'||order.status==='completed'?`<button class="btn btn-ghost" onclick="updStatus(${order.id},'refunded')">Mark Refunded</button>`:''}
+        <button class="btn btn-ghost ml-auto" onclick="closeDetail()">Close</button>
+      </div>`;
+  }catch(e){document.getElementById('ddBody').innerHTML=`<p style="color:var(--red);padding:20px">${e.message}</p>`;}
+}
+
+async function updStatus(id,status){
+  if(!confirm(`Mark order as "${status}"?`))return;
+  try{await API.put(`/api/orders/${id}/status`,{status});showToast('Order updated','success');closeDetail();loadOrders();}
+  catch(e){showToast(e.message,'error');}
+}
+
+function closeDetail(){document.getElementById('detOv').classList.remove('open');document.getElementById('detDr').classList.remove('open');}
+</script>
+</body>
+</html>

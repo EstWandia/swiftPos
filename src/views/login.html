@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SwiftPOS — Sign In</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+body{display:flex;align-items:center;justify-content:center;min-height:100dvh;
+  background:radial-gradient(ellipse at 20% 50%,rgba(61,139,255,.08) 0%,transparent 60%),
+             radial-gradient(ellipse at 80% 20%,rgba(108,79,255,.08) 0%,transparent 60%),var(--bg)}
+.wrap{width:100%;max-width:400px;padding:20px}
+.logo-block{text-align:center;margin-bottom:32px}
+.logo-block h1{font-size:34px;font-weight:800;background:linear-gradient(135deg,var(--a),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-block p{color:var(--t2);font-size:13px;margin-top:6px}
+.login-card{background:var(--s1);border:1px solid var(--border);border-radius:18px;padding:30px}
+.lbl{display:block;font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px}
+.fg{margin-bottom:18px}
+.err{color:var(--red);font-size:12.5px;margin-top:10px;text-align:center;display:none}
+.err.show{display:block}
+.sbtn{width:100%;padding:15px;border:none;border-radius:var(--r);background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer;box-shadow:0 4px 18px rgba(61,139,255,.3);transition:all .16s;margin-top:4px}
+.sbtn:hover{transform:translateY(-2px);box-shadow:0 7px 26px rgba(61,139,255,.5)}
+.sbtn:disabled{opacity:.4;pointer-events:none}
+.demo{margin-top:18px;background:var(--s3);border:1px solid var(--border);border-radius:var(--rs);padding:14px 16px}
+.demo-title{font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+.demo-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:opacity .12s}
+.demo-row:hover{opacity:.8}
+.demo-row:last-child{border:none;padding-bottom:0}
+.demo-role{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.demo-email{font-family:var(--mono);font-size:11.5px;color:var(--t2);flex:1}
+.demo-pw{font-family:var(--mono);font-size:10px;color:var(--t3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo-block">
+    <h1>⚡ SwiftPOS</h1>
+    <p>Multi-business Point of Sale</p>
+  </div>
+  <div class="login-card">
+    <div class="fg"><label class="lbl">Email</label><input class="input" id="email" type="email" placeholder="your@email.com" autofocus></div>
+    <div class="fg"><label class="lbl">Password</label><input class="input" id="password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="err" id="errMsg"></div>
+    <button class="sbtn" id="loginBtn" onclick="doLogin()">Sign In →</button>
+  </div>
+
+  <div class="demo">
+    <div class="demo-title">Demo Accounts — click to fill</div>
+    <div class="demo-row" onclick="fill('admin@nadiasbistro.com','demo123')">
+      <span class="demo-role badge badge-hot">Admin</span>
+      <span class="demo-email">admin@nadiasbistro.com</span>
+      <span class="demo-pw">Nadia's Bistro</span>
+    </div>
+    <div class="demo-row" onclick="fill('cashier@nadiasbistro.com','demo123')">
+      <span class="demo-role badge badge-blue">Cashier</span>
+      <span class="demo-email">cashier@nadiasbistro.com</span>
+      <span class="demo-pw">Nadia's Bistro</span>
+    </div>
+    <div class="demo-row" onclick="fill('admin@citypharmacy.com','demo123')">
+      <span class="demo-role badge badge-hot">Admin</span>
+      <span class="demo-email">admin@citypharmacy.com</span>
+      <span class="demo-pw">City Pharmacy</span>
+    </div>
+    <div class="demo-row" onclick="fill('admin@cornerretail.com','demo123')">
+      <span class="demo-role badge badge-hot">Admin</span>
+      <span class="demo-email">admin@cornerretail.com</span>
+      <span class="demo-pw">Corner Retail</span>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script>
+function fill(e,p){document.getElementById('email').value=e;document.getElementById('password').value=p;}
+async function doLogin(){
+  const btn=document.getElementById('loginBtn');
+  const err=document.getElementById('errMsg');
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  if(!email||!password){err.textContent='Please enter email and password';err.classList.add('show');return;}
+  btn.textContent='Signing in…';btn.disabled=true;err.classList.remove('show');
+  try{
+    const res=await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error);
+    window.location.href='/';
+  }catch(e){
+    err.textContent=e.message||'Login failed';err.classList.add('show');
+    btn.textContent='Sign In →';btn.disabled=false;
+  }
+}
+</script>
+</body>
+</html>

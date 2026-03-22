@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>SwiftPOS — Register</title>
+<link rel="stylesheet" href="/css/main.css">
+<link rel="stylesheet" href="/css/pos.css">
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <span class="logo" id="bizName">⚡ SwiftPOS</span>
+  <nav class="nav-links" id="navLinks"></nav>
+
+  <!-- Desktop search bar (hidden on mobile) -->
+  <div class="search-wrap desk-search">
+    <span class="si">🔍</span>
+    <input class="input search-box" id="searchBox" type="search"
+      placeholder="Search name, SKU, barcode…" autocomplete="off"
+      oninput="onSearch(this.value)"
+      onkeydown="searchKeyNav(event)"
+      onfocus="openSDD()"
+      onblur="setTimeout(closeSDD,160)">
+    <button class="sc-btn" id="scBtn" onclick="clearSearch()">✕</button>
+    <div class="sdd" id="sdd"></div>
+  </div>
+
+  <div class="flex items-center gap-2" style="flex-shrink:0;margin-left:auto">
+    <!-- Mobile search icon (hidden on desktop) -->
+    <button class="tb-btn mob-search-btn" id="mobSearchBtn" onclick="openMobSearch()" title="Search" aria-label="Search">🔍</button>
+    <button class="tb-btn" title="Barcode scan" onclick="scanMode()">📷</button>
+    <div class="avatar" id="userAvatar" title="Logout" onclick="window.location='/auth/logout'"></div>
+  </div>
+</header>
+
+<div class="pos-body">
+  <!-- CATEGORY PANEL -->
+  <nav class="cat-panel">
+    <div class="cp-head">Categories</div>
+    <div class="cp-list" id="catList"></div>
+  </nav>
+
+  <!-- MAIN AREA -->
+  <main class="main-area">
+    <div class="recents-bar" id="recentsBarWrap">
+      <span class="rec-lbl">⚡ Recent</span>
+      <div id="recentsChips" style="display:contents"></div>
+    </div>
+    <div class="subcat-bar" id="subcatBar"></div>
+    <div class="prod-toolbar">
+      <span class="result-count" id="resultCount">Loading…</span>
+      <div class="flex gap-2 ml-auto">
+        <button class="view-btn active" id="btnGrid" onclick="setView('grid')" title="Grid">⊞</button>
+        <button class="view-btn"        id="btnList" onclick="setView('list')" title="List">☰</button>
+        <select class="sort-sel" onchange="onSortChange(this.value)">
+          <option value="popular">Popular</option>
+          <option value="name">A–Z</option>
+          <option value="price-asc">Price ↑</option>
+          <option value="price-desc">Price ↓</option>
+        </select>
+      </div>
+    </div>
+    <div class="prod-area">
+      <div class="prod-grid" id="prodGrid"><div class="spinner"></div></div>
+    </div>
+  </main>
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <span><span class="dot"></span>Online</span>
+  <span id="cashierName" style="color:var(--t2)"></span>
+  <span id="clock" class="mono ml-auto"></span>
+  <span id="itemsLoaded" style="color:var(--t3)"></span>
+</div>
+
+<!-- FAB -->
+<div class="fab-wrap">
+  <button class="fab" id="fab" onclick="openOrder()">
+    <span class="fab-ico">🛒</span>
+    <span class="fab-lbl">Order</span>
+    <span class="fab-badge mono" id="fabBadge">0</span>
+    <span class="fab-total mono" id="fabTotal">€0.00</span>
+  </button>
+</div>
+
+<!-- OVERLAY -->
+<div class="modal-overlay" id="overlay" onclick="closeOrder()"></div>
+
+<!-- ORDER DRAWER -->
+<div class="order-drawer" id="orderDrawer">
+
+  <!-- SUCCESS FLASH -->
+  <div class="success-flash" id="successFlash">
+    <div class="sf-ico">✅</div>
+    <div class="sf-title">Payment Complete!</div>
+    <div class="sf-num" id="sfOrderNum"></div>
+    <div class="sf-amt" id="sfAmt">€0.00</div>
+    <div class="sf-chg" id="sfChange" style="display:none"></div>
+  </div>
+
+  <!-- Handle (mobile swipe) -->
+  <div class="od-handle" id="odHandle"><div class="od-bar"></div></div>
+
+  <!-- Header -->
+  <div class="od-head">
+    <div class="flex items-center gap-2">
+      <span class="od-title">Current Order</span>
+      <span class="od-badge" id="odBadge">0 items</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="clearCart()">🗑 Clear</button>
+      <button class="od-close" onclick="closeOrder()">✕</button>
+    </div>
+  </div>
+
+  <!-- Customer -->
+  <div class="od-customer" onclick="openCustomerSearch()">
+    <div class="cust-av">👤</div>
+    <div class="cust-info">
+      <div class="cust-name" id="custName">Walk-in Customer</div>
+      <div class="cust-sub"  id="custSub">Tap to assign</div>
+    </div>
+    <span style="color:var(--t3);font-size:18px">›</span>
+  </div>
+
+  <!-- Empty state — OUTSIDE odItems so innerHTML never destroys it -->
+  <div class="cart-empty" id="cartEmpty">
+    <div class="ei">🛒</div>
+    <h3>Order is empty</h3>
+    <p>Tap any product to add it</p>
+  </div>
+
+  <!-- Items — THIS IS THE SCROLLABLE SECTION -->
+  <div class="od-items" id="odItems"></div>
+
+  <!-- FOOTER — always visible, never scrolls away -->
+  <div class="od-foot">
+    <!-- Totals strip -->
+    <div class="tot-strip">
+      <div class="tot-cell"><div class="tc-lbl">Subtotal</div><div class="tc-val mono" id="tSub">€0.00</div></div>
+      <div class="tot-cell"><div class="tc-lbl">Tax</div><div class="tc-val mono" id="tTax">€0.00</div></div>
+      <div class="tot-cell"><div class="tc-lbl">Discount</div><div class="tc-val mono" id="tDisc">€0.00</div></div>
+    </div>
+    <!-- Grand total -->
+    <div class="grand-row">
+      <span class="gr-lbl">Total</span>
+      <span class="gr-val mono" id="tTotal">€0.00</span>
+    </div>
+    <!-- Discount input -->
+    <div class="disc-row">
+      <input class="input" id="discIn" placeholder="Code or % or fixed amount (e.g. 10% or 5)" style="flex:1">
+      <button class="btn btn-ghost" onclick="applyDiscount()">Apply</button>
+    </div>
+    <!-- Payment methods -->
+    <div class="pay-row">
+      <button class="pay-opt on" data-method="cash" onclick="setPay(this)"><span class="pi">💵</span>Cash</button>
+      <button class="pay-opt"    data-method="card" onclick="setPay(this)"><span class="pi">💳</span>Card</button>
+      <button class="pay-opt"    data-method="qr"   onclick="setPay(this)"><span class="pi">📱</span>QR Pay</button>
+    </div>
+    <!-- Cash tendered -->
+    <div class="cash-row show" id="cashRow">
+      <input class="input" id="tenderedIn" type="number" placeholder="Amount tendered" step="0.01" min="0" oninput="calcChange()">
+      <div class="change-display" id="changeDisplay"></div>
+    </div>
+    <!-- Charge button -->
+    <button class="charge-btn" id="chargeBtn" onclick="checkout()" disabled>
+      <span id="chargeBtnLabel">✓ &nbsp;Complete Order</span>
+      <span class="charge-sep">&nbsp;·&nbsp;</span>
+      <span id="chargeAmt" class="mono">€0.00</span>
+    </button>
+  </div>
+</div>
+
+<!-- FLOATING SEARCH OVERLAY (mobile only) -->
+<div class="mob-search-overlay" id="mobSearchOverlay" onclick="closeMobSearch(event)">
+  <div class="mob-search-box">
+    <span class="mob-si">🔍</span>
+    <input class="mob-search-input" id="mobSearchInput" type="search"
+      placeholder="Search name, SKU or barcode…"
+      autocomplete="off"
+      oninput="onSearch(this.value)"
+      onkeydown="searchKeyNav(event)">
+    <button class="mob-search-close" onclick="closeMobSearch()">✕</button>
+    <!-- results dropdown reuses same sdd positioned under this bar -->
+    <div class="mob-sdd" id="mobSdd"></div>
+  </div>
+</div>
+
+<!-- CUSTOMER SEARCH MODAL -->
+<div class="cust-modal" id="custModal">
+  <div class="cm-box">
+    <div class="flex items-center justify-between" style="margin-bottom:14px">
+      <h3 style="font-size:15px">Assign Customer</h3>
+      <button class="od-close" onclick="closeCustSearch()">✕</button>
+    </div>
+    <input class="input" id="custSearchIn" placeholder="Search name, phone or email…" oninput="searchCustomers(this.value)" style="margin-bottom:10px">
+    <div id="custResults"></div>
+    <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="openNewCustomer()">+ New Customer</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script src="/js/pos.js"></script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SwiftPOS — Reports</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+body{display:flex;flex-direction:column;height:100%;overflow:hidden}
+.page-body{flex:1;overflow-y:auto;padding:16px 16px 80px}
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:20px}
+.sc{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:15px}
+.sl{font-size:10px;color:var(--t2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px}
+.sv{font-size:26px;font-weight:800;font-family:var(--mono)}
+.sv.g{color:var(--green)}.sv.b{color:var(--a)}.sv.a{color:var(--amber)}
+.sec-t{font-size:14px;font-weight:700;color:var(--t2);margin:20px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;margin-bottom:24px}
+th{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;padding:8px 12px;border-bottom:1px solid var(--border);text-align:left}
+td{font-size:13px;padding:11px 12px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--s2)}
+.rank{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--a),var(--a2));display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff}
+.dr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <span class="logo" id="bizName">⚡ SwiftPOS</span>
+  <nav class="nav-links" id="navLinks"></nav>
+  <div class="topbar-right">
+    <div class="avatar" id="userAvatar" onclick="window.location='/auth/logout'" title="Sign out"></div>
+  </div>
+</header>
+<div class="page-body">
+  <h2 style="font-size:18px;margin-bottom:14px">📊 Sales Reports</h2>
+  <div class="dr">
+    <span style="font-size:12px;color:var(--t2);font-weight:600">Period:</span>
+    <input class="input" type="date" id="rFrom" style="width:auto">
+    <span style="color:var(--t2)">to</span>
+    <input class="input" type="date" id="rTo" style="width:auto">
+    <button class="btn btn-primary" onclick="loadReport()">Load Report</button>
+    <button class="btn btn-ghost" onclick="setQuick('today')">Today</button>
+    <button class="btn btn-ghost" onclick="setQuick('week')">This Week</button>
+    <button class="btn btn-ghost" onclick="setQuick('month')">This Month</button>
+  </div>
+  <div class="sg" id="statsGrid"><div class="spinner"></div></div>
+  <div class="sec-t">🏆 Top Selling Items</div>
+  <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>Item</th><th>Category</th><th>Qty Sold</th><th>Revenue</th></tr></thead><tbody id="topItems"></tbody></table></div>
+  <div class="sec-t">📂 Revenue by Category</div>
+  <div style="overflow-x:auto"><table><thead><tr><th>Category</th><th>Qty Sold</th><th>Revenue</th><th>Share</th></tr></thead><tbody id="catBreak"></tbody></table></div>
+</div>
+<div class="statusbar"><span><span class="dot"></span>Online</span><span id="clock" class="mono ml-auto"></span></div>
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script>
+(async function(){
+  try{const{user}=await API.get('/api/me');
+    document.getElementById('userAvatar').textContent=user.name.slice(0,2).toUpperCase();
+    document.getElementById('bizName').textContent=user.business?.name||'SwiftPOS';
+    window._currSym=user.business?.currency_sym||'€';
+    buildNav(user.role,'/reports');
+  }catch{window.location.href='/login';return;}
+  startClock('clock');
+  const today=new Date().toISOString().split('T')[0];
+  const m1=today.slice(0,8)+'01';
+  document.getElementById('rFrom').value=m1;
+  document.getElementById('rTo').value=today;
+  loadReport();
+})();
+
+function setQuick(p){
+  const t=new Date(),y=d=>d.toISOString().split('T')[0];
+  if(p==='today'){document.getElementById('rFrom').value=y(t);document.getElementById('rTo').value=y(t);}
+  else if(p==='week'){const d=new Date(t);d.setDate(t.getDate()-t.getDay());document.getElementById('rFrom').value=y(d);document.getElementById('rTo').value=y(t);}
+  else if(p==='month'){document.getElementById('rFrom').value=y(t).slice(0,8)+'01';document.getElementById('rTo').value=y(t);}
+  loadReport();
+}
+
+async function loadReport(){
+  const df=document.getElementById('rFrom').value;
+  const dt=document.getElementById('rTo').value;
+  document.getElementById('statsGrid').innerHTML='<div class="spinner"></div>';
+  try{
+    const{summary,topItems,catBreakdown}=await API.get(`/api/orders/summary/today?date_from=${df}&date_to=${dt}`);
+    document.getElementById('statsGrid').innerHTML=`
+      <div class="sc"><div class="sl">Orders</div><div class="sv b">${summary.order_count||0}</div></div>
+      <div class="sc"><div class="sl">Revenue</div><div class="sv g">${fmt(summary.revenue||0)}</div></div>
+      <div class="sc"><div class="sl">Tax Collected</div><div class="sv">${fmt(summary.tax_collected||0)}</div></div>
+      <div class="sc"><div class="sl">Discounts</div><div class="sv a">${fmt(summary.discounts_given||0)}</div></div>
+      <div class="sc"><div class="sl">Avg. Order</div><div class="sv">${fmt(summary.avg_order_value||0)}</div></div>`;
+    document.getElementById('topItems').innerHTML=(topItems||[]).length
+      ?(topItems||[]).map((it,i)=>`<tr><td><span class="rank">${i+1}</span></td>
+          <td><span style="font-size:16px">${it.emoji||'🛒'}</span> <strong>${it.name}</strong> <span style="font-size:10px;color:var(--t3)">${it.sku}</span></td>
+          <td><span class="badge badge-blue">${it.category}</span></td>
+          <td class="mono">${it.total_qty}</td>
+          <td class="mono" style="color:var(--green)">${fmt(it.total_revenue)}</td></tr>`).join('')
+      :'<tr><td colspan="5"><div class="empty-state"><p>No data for this period</p></div></td></tr>';
+    const totalRev=(catBreakdown||[]).reduce((s,c)=>s+parseFloat(c.revenue||0),0);
+    document.getElementById('catBreak').innerHTML=(catBreakdown||[]).length
+      ?(catBreakdown||[]).map(c=>`<tr>
+          <td><strong>${c.category_name}</strong></td>
+          <td class="mono">${c.qty_sold}</td>
+          <td class="mono" style="color:var(--green)">${fmt(c.revenue)}</td>
+          <td>${totalRev>0?((parseFloat(c.revenue)/totalRev)*100).toFixed(1)+'%':'—'}</td></tr>`).join('')
+      :'<tr><td colspan="4"><div class="empty-state"><p>No data</p></div></td></tr>';
+  }catch(e){showToast(e.message,'error');document.getElementById('statsGrid').innerHTML=`<p style="color:var(--red)">${e.message}</p>`;}
+}
+</script>
+</body>
+</html>

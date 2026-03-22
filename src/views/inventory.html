@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SwiftPOS — Inventory</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+body{display:flex;flex-direction:column;height:100%;overflow:hidden}
+.page-body{flex:1;overflow-y:auto;padding:16px 16px 80px}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:4px;margin-bottom:18px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:4px;width:fit-content}
+.tab{padding:8px 18px;border-radius:calc(var(--r) - 3px);font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;color:var(--t2);font-family:var(--font);transition:all .14s;white-space:nowrap}
+.tab.active{background:var(--s1);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.3)}
+
+/* ── Filters ── */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.fi{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-family:var(--font);font-size:12px;padding:7px 10px;outline:none}
+.fi:focus{border-color:var(--a)}
+
+/* ── Items table ── */
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+td{font-size:13px;padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:var(--s2)}
+.sl{color:var(--red);font-weight:700}
+.so{color:var(--green)}
+
+/* ── Category cards ── */
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.cat-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:border-color .15s}
+.cat-card:hover{border-color:var(--border2)}
+.cat-card-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.cat-icon{font-size:26px;flex-shrink:0}
+.cat-info{flex:1;min-width:0}
+.cat-name{font-size:15px;font-weight:700}
+.cat-meta{font-size:11px;color:var(--t2);margin-top:2px}
+.cat-actions{display:flex;gap:6px;flex-shrink:0}
+.sub-list{padding:10px 16px}
+.sub-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.sub-item:last-child{border:none}
+.sub-name{color:var(--text);font-weight:500}
+.sub-cnt{color:var(--t3);font-family:var(--mono);font-size:11px}
+.sub-btns{display:flex;gap:4px;opacity:0;transition:opacity .12s}
+.sub-item:hover .sub-btns{opacity:1}
+.add-sub-row{padding:8px 16px 12px;border-top:1px solid var(--border)}
+.add-sub-input{width:100%;display:flex;gap:6px}
+
+/* ── Modals ── */
+.em{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(5px);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.em.open{opacity:1;pointer-events:all}
+.eb{background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:24px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;margin:16px}
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.fl{font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px}
+.fg2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ── Mobile ── */
+@media(max-width:640px){
+  .tabs{width:100%}
+  .tab{flex:1;text-align:center;padding:8px 8px}
+  .cat-grid{grid-template-columns:1fr}
+  .sub-btns{opacity:1}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="logo" id="bizName">⚡ SwiftPOS</span>
+  <nav class="nav-links" id="navLinks"></nav>
+  <div class="topbar-right">
+    <button class="btn btn-primary" id="addBtn" onclick="handleAdd()" style="white-space:nowrap">+ Add Item</button>
+    <div class="avatar" id="userAvatar" onclick="window.location='/auth/logout'" title="Sign out"></div>
+  </div>
+</header>
+
+<div class="page-body">
+  <h2 style="font-size:18px;margin-bottom:14px">📦 Inventory</h2>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" id="tabItems" onclick="switchTab('items')">📦 Items</button>
+    <button class="tab"        id="tabCats"  onclick="switchTab('cats')">📂 Categories</button>
+  </div>
+
+  <!-- ── ITEMS TAB ── -->
+  <div id="panelItems">
+    <div class="filters">
+      <input class="fi" id="invSearch" placeholder="Search name or SKU…" oninput="filterInv()" style="width:200px;max-width:100%">
+      <select class="fi" id="invCat" onchange="filterInv()"><option value="">All Categories</option></select>
+      <label style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="lowOnly" onchange="filterInv()"> Low stock only
+      </label>
+      <span class="ml-auto" style="font-size:12px;color:var(--t2)" id="invCount"></span>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Item</th><th>SKU</th><th>Category</th><th>Price</th><th>Cost</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="invBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── CATEGORIES TAB ── -->
+  <div id="panelCats" style="display:none">
+    <div class="filters" style="margin-bottom:16px">
+      <span style="font-size:13px;color:var(--t2)"><strong id="catCount">0</strong> categories</span>
+      <button class="btn btn-primary ml-auto" onclick="openAddCat()">+ Add Category</button>
+    </div>
+    <div class="cat-grid" id="catGrid"></div>
+  </div>
+</div>
+
+<div class="statusbar"><span><span class="dot"></span>Online</span><span id="clock" class="mono ml-auto"></span></div>
+
+<!-- ══ ITEM MODAL ══ -->
+<div class="em" id="editModal">
+  <div class="eb">
+    <div class="flex items-center justify-between" style="margin-bottom:18px">
+      <h3 id="editTitle" style="font-size:16px">Add Item</h3>
+      <button class="od-close" onclick="closeEdit()">✕</button>
+    </div>
+    <div class="fg2">
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Name *</label><input class="input" id="eName" placeholder="Product name"></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Description</label><input class="input" id="eDesc" placeholder="Short description"></div>
+      <div class="fg"><label class="fl">SKU *</label><input class="input" id="eSku" placeholder="SKU001"></div>
+      <div class="fg"><label class="fl">Barcode</label><input class="input" id="eBarcode" placeholder="Optional"></div>
+      <div class="fg"><label class="fl">Category *</label><select class="input" id="eCat" onchange="loadSubsFor(this.value)"></select></div>
+      <div class="fg"><label class="fl">Subcategory</label><select class="input" id="eSub"></select></div>
+      <div class="fg"><label class="fl">Price *</label><input class="input" id="ePrice" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Cost Price</label><input class="input" id="eCost" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Stock Qty</label><input class="input" id="eStock" type="number" placeholder="0"></div>
+      <div class="fg"><label class="fl">Tax Rate %</label><input class="input" id="eTax" type="number" value="10" placeholder="10"></div>
+      <div class="fg"><label class="fl">Emoji</label><input class="input" id="eEmoji" placeholder="🛒"></div>
+      <div class="fg"><label class="fl">Badge</label>
+        <select class="input" id="eBadge">
+          <option value="">None</option><option value="hot">🔥 Hot</option>
+          <option value="new">✨ New</option><option value="sale">💰 Sale</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Active</label>
+        <select class="input" id="eActive"><option value="1">Yes</option><option value="0">No (hidden)</option></select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveItem()">Save Item</button>
+      <button class="btn btn-ghost" onclick="closeEdit()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CATEGORY MODAL ══ -->
+<div class="em" id="catModal">
+  <div class="eb" style="max-width:400px">
+    <div class="flex items-center justify-between" style="margin-bottom:18px">
+      <h3 id="catModalTitle" style="font-size:16px">Add Category</h3>
+      <button class="od-close" onclick="closeCatModal()">✕</button>
+    </div>
+    <div class="fg"><label class="fl">Category Name *</label><input class="input" id="cName" placeholder="e.g. Beverages"></div>
+    <div class="fg"><label class="fl">Emoji *</label><input class="input" id="cEmoji" placeholder="🥤" style="font-size:22px;padding:8px 12px"></div>
+    <div class="fg"><label class="fl">Description</label><input class="input" id="cDesc" placeholder="Optional"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveCat()">Save Category</button>
+      <button class="btn btn-ghost" onclick="closeCatModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SUBCATEGORY MODAL ══ -->
+<div class="em" id="subModal">
+  <div class="eb" style="max-width:380px">
+    <div class="flex items-center justify-between" style="margin-bottom:18px">
+      <h3 id="subModalTitle" style="font-size:16px">Add Subcategory</h3>
+      <button class="od-close" onclick="closeSubModal()">✕</button>
+    </div>
+    <div style="background:var(--s3);border-radius:var(--rs);padding:10px 12px;margin-bottom:14px;font-size:13px">
+      <span style="color:var(--t2)">Under: </span>
+      <strong id="subParentName">—</strong>
+    </div>
+    <div class="fg"><label class="fl">Subcategory Name *</label><input class="input" id="sName" placeholder="e.g. Craft Beers" onkeydown="if(event.key==='Enter')saveSub()"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveSub()">Add Subcategory</button>
+      <button class="btn btn-ghost" onclick="closeSubModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script>
+let allItems=[], allCats=[], editId=null, editCatId=null, addSubForCatId=null, currentTab='items';
+
+/* ══ INIT ══ */
+(async function(){
+  try{
+    const{user}=await API.get('/api/me');
+    document.getElementById('userAvatar').textContent=user.name.slice(0,2).toUpperCase();
+    document.getElementById('bizName').textContent=user.business?.name||'SwiftPOS';
+    window._currSym=user.business?.currency_sym||'€';
+    buildNav(user.role,'/inventory');
+  }catch{ window.location.href='/login'; return; }
+  startClock('clock');
+  await refreshAll();
+})();
+
+async function refreshAll(){
+  const[{items},{categories}]=await Promise.all([
+    API.get('/api/items?sort=name'),
+    API.get('/api/categories')
+  ]);
+  allItems=items; allCats=categories;
+  // Filter dropdown
+  const sel=document.getElementById('invCat');
+  const prev=sel.value;
+  sel.innerHTML='<option value="">All Categories</option>';
+  allCats.forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.emoji} ${c.name}</option>`);
+  sel.value=prev;
+  buildCatSelect();
+  filterInv();
+  renderCatGrid();
+}
+
+/* ══ TAB SWITCHER ══ */
+function switchTab(tab){
+  currentTab=tab;
+  document.getElementById('panelItems').style.display=tab==='items'?'':'none';
+  document.getElementById('panelCats').style.display=tab==='cats'?'':'none';
+  document.getElementById('tabItems').classList.toggle('active',tab==='items');
+  document.getElementById('tabCats').classList.toggle('active',tab==='cats');
+  document.getElementById('addBtn').textContent=tab==='items'?'+ Add Item':'+ Add Category';
+}
+
+function handleAdd(){
+  if(currentTab==='items') openAdd();
+  else openAddCat();
+}
+
+/* ══ ITEMS ══ */
+function buildCatSelect(){
+  const s=document.getElementById('eCat');
+  s.innerHTML=allCats.map(c=>`<option value="${c.id}">${c.emoji} ${c.name}</option>`).join('');
+  if(allCats.length) loadSubsFor(allCats[0].id);
+}
+
+function loadSubsFor(catId){
+  const cat=allCats.find(c=>String(c.id)===String(catId));
+  const s=document.getElementById('eSub');
+  s.innerHTML='<option value="">None</option>'+(cat?.subcategories||[]).map(sub=>`<option value="${sub.id}">${sub.name}</option>`).join('');
+}
+
+function filterInv(){
+  const q=(document.getElementById('invSearch').value||'').toLowerCase();
+  const cid=document.getElementById('invCat').value;
+  const lo=document.getElementById('lowOnly').checked;
+  const f=allItems.filter(it=>{
+    if(cid&&String(it.category_id)!==cid)return false;
+    if(lo&&it.track_stock&&parseInt(it.stock_qty)>parseInt(it.low_stock_alert))return false;
+    if(q&&!it.name.toLowerCase().includes(q)&&!it.sku.toLowerCase().includes(q))return false;
+    return true;
+  });
+  document.getElementById('invCount').textContent=`${f.length} items`;
+  document.getElementById('invBody').innerHTML=f.length
+    ?f.map(it=>`<tr>
+        <td><span style="font-size:18px">${it.emoji}</span> <strong>${it.name}</strong><div style="font-size:11px;color:var(--t3)">${it.description||''}</div></td>
+        <td class="mono" style="color:var(--t2)">${it.sku}</td>
+        <td>${it.category_emoji||''} ${it.category_name||''}</td>
+        <td class="mono">${fmt(it.price)}</td>
+        <td class="mono" style="color:var(--t3)">${it.cost_price?fmt(it.cost_price):'—'}</td>
+        <td class="${it.track_stock&&parseInt(it.stock_qty)<=parseInt(it.low_stock_alert)?'sl':'so'} mono">${it.track_stock?it.stock_qty:'∞'}</td>
+        <td><span class="badge ${it.is_active?'badge-ok':'badge-err'}">${it.is_active?'Active':'Hidden'}</span></td>
+        <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="openEdit(${it.id})">Edit</button></td>
+      </tr>`).join('')
+    :'<tr><td colspan="8"><div class="empty-state"><div class="ei">📦</div><h3>No items found</h3></div></td></tr>';
+}
+
+function openAdd(){
+  editId=null;
+  document.getElementById('editTitle').textContent='Add Item';
+  ['eName','eDesc','eSku','eBarcode','ePrice','eCost'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('eStock').value='0';
+  document.getElementById('eTax').value='10';
+  document.getElementById('eEmoji').value='🛒';
+  document.getElementById('eBadge').value='';
+  document.getElementById('eActive').value='1';
+  if(allCats.length){ document.getElementById('eCat').value=allCats[0].id; loadSubsFor(allCats[0].id); }
+  document.getElementById('editModal').classList.add('open');
+}
+
+function openEdit(id){
+  const it=allItems.find(x=>x.id===id); if(!it)return;
+  editId=id;
+  document.getElementById('editTitle').textContent='Edit Item';
+  document.getElementById('eName').value=it.name;
+  document.getElementById('eDesc').value=it.description||'';
+  document.getElementById('eSku').value=it.sku;
+  document.getElementById('eBarcode').value=it.barcode||'';
+  document.getElementById('ePrice').value=it.price;
+  document.getElementById('eCost').value=it.cost_price||'';
+  document.getElementById('eStock').value=it.stock_qty;
+  document.getElementById('eTax').value=it.tax_rate||10;
+  document.getElementById('eEmoji').value=it.emoji||'🛒';
+  document.getElementById('eBadge').value=it.badge||'';
+  document.getElementById('eActive').value=it.is_active?'1':'0';
+  document.getElementById('eCat').value=it.category_id;
+  loadSubsFor(it.category_id);
+  setTimeout(()=>document.getElementById('eSub').value=it.subcategory_id||'',80);
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEdit(){ document.getElementById('editModal').classList.remove('open'); }
+
+async function saveItem(){
+  const payload={
+    name:document.getElementById('eName').value.trim(),
+    description:document.getElementById('eDesc').value.trim(),
+    sku:document.getElementById('eSku').value.trim(),
+    barcode:document.getElementById('eBarcode').value.trim()||null,
+    category_id:parseInt(document.getElementById('eCat').value),
+    subcategory_id:parseInt(document.getElementById('eSub').value)||null,
+    price:parseFloat(document.getElementById('ePrice').value)||0,
+    cost_price:parseFloat(document.getElementById('eCost').value)||null,
+    stock_qty:parseInt(document.getElementById('eStock').value)||0,
+    tax_rate:parseFloat(document.getElementById('eTax').value)||10,
+    emoji:document.getElementById('eEmoji').value||'🛒',
+    badge:document.getElementById('eBadge').value||null,
+    is_active:parseInt(document.getElementById('eActive').value)
+  };
+  if(!payload.name||!payload.sku){ showToast('Name and SKU are required','error'); return; }
+  try{
+    if(editId) await API.put(`/api/items/${editId}`,payload);
+    else await API.post('/api/items',payload);
+    showToast('✅ Item saved','success');
+    closeEdit();
+    await refreshAll();
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+/* ══ CATEGORIES ══ */
+function renderCatGrid(){
+  const grid=document.getElementById('catGrid');
+  document.getElementById('catCount').textContent=allCats.length;
+  if(!allCats.length){
+    grid.innerHTML='<div class="empty-state"><div class="ei">📂</div><h3>No categories yet</h3><p>Add your first category above</p></div>';
+    return;
+  }
+  grid.innerHTML=allCats.map(c=>`
+    <div class="cat-card" id="catcard-${c.id}">
+      <div class="cat-card-head">
+        <span class="cat-icon">${c.emoji}</span>
+        <div class="cat-info">
+          <div class="cat-name">${c.name}</div>
+          <div class="cat-meta">${c.item_count||0} items · ${(c.subcategories||[]).length} subcategories</div>
+        </div>
+        <div class="cat-actions">
+          <button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="openEditCat(${c.id})" title="Edit">✏️</button>
+          <button class="btn btn-primary" style="padding:4px 9px;font-size:11px" onclick="openAddSub(${c.id},'${esc(c.name)}')" title="Add subcategory">+ Sub</button>
+        </div>
+      </div>
+      <div class="sub-list">
+        ${(c.subcategories||[]).length===0
+          ? '<div style="font-size:12px;color:var(--t3);padding:4px 0">No subcategories yet</div>'
+          : (c.subcategories||[]).map(s=>`
+            <div class="sub-item">
+              <span class="sub-name">↳ ${s.name}</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="sub-cnt">${s.item_count||0} items</span>
+                <div class="sub-btns">
+                  <button class="btn btn-danger" style="padding:2px 7px;font-size:10px" onclick="deleteSub(${s.id},${c.id},'${esc(s.name)}')">✕</button>
+                </div>
+              </div>
+            </div>`).join('')
+        }
+      </div>
+      <div class="add-sub-row">
+        <div class="add-sub-input">
+          <input class="input" id="quicksub-${c.id}" placeholder="Quick add subcategory…" style="font-size:12px;padding:7px 10px"
+                 onkeydown="if(event.key==='Enter')quickAddSub(${c.id})">
+          <button class="btn btn-ghost" style="padding:7px 12px;font-size:12px;white-space:nowrap" onclick="quickAddSub(${c.id})">+ Add</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function esc(s){ return (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+/* Add category */
+function openAddCat(){
+  editCatId=null;
+  document.getElementById('catModalTitle').textContent='Add Category';
+  document.getElementById('cName').value='';
+  document.getElementById('cEmoji').value='';
+  document.getElementById('cDesc').value='';
+  document.getElementById('catModal').classList.add('open');
+  setTimeout(()=>document.getElementById('cName').focus(),100);
+}
+
+function openEditCat(id){
+  const c=allCats.find(x=>x.id===id); if(!c)return;
+  editCatId=id;
+  document.getElementById('catModalTitle').textContent='Edit Category';
+  document.getElementById('cName').value=c.name;
+  document.getElementById('cEmoji').value=c.emoji||'';
+  document.getElementById('cDesc').value=c.description||'';
+  document.getElementById('catModal').classList.add('open');
+  setTimeout(()=>document.getElementById('cName').focus(),100);
+}
+
+function closeCatModal(){ document.getElementById('catModal').classList.remove('open'); }
+
+async function saveCat(){
+  const name=document.getElementById('cName').value.trim();
+  const emoji=document.getElementById('cEmoji').value.trim()||'🏷️';
+  const description=document.getElementById('cDesc').value.trim()||null;
+  if(!name){ showToast('Category name is required','error'); return; }
+  const slug=name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  try{
+    if(editCatId){
+      await API.put(`/api/categories/${editCatId}`,{name,slug,emoji,description,sort_order:0,is_active:1});
+      showToast('✅ Category updated','success');
+    } else {
+      await API.post('/api/categories',{name,slug,emoji,description,sort_order:0});
+      showToast('✅ Category added','success');
+    }
+    closeCatModal();
+    await refreshAll();
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+/* Add subcategory (modal) */
+function openAddSub(catId,catName){
+  addSubForCatId=catId;
+  document.getElementById('subParentName').textContent=catName;
+  document.getElementById('sName').value='';
+  document.getElementById('subModal').classList.add('open');
+  setTimeout(()=>document.getElementById('sName').focus(),100);
+}
+function closeSubModal(){ document.getElementById('subModal').classList.remove('open'); }
+
+async function saveSub(){
+  const name=document.getElementById('sName').value.trim();
+  if(!name){ showToast('Subcategory name is required','error'); return; }
+  await addSubcategory(addSubForCatId, name);
+  closeSubModal();
+}
+
+/* Quick-add subcategory inline */
+async function quickAddSub(catId){
+  const inp=document.getElementById('quicksub-'+catId);
+  const name=inp.value.trim();
+  if(!name){ showToast('Enter a subcategory name','error'); return; }
+  await addSubcategory(catId, name);
+  inp.value='';
+}
+
+async function addSubcategory(catId, name){
+  const slug=name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  try{
+    await API.post(`/api/categories/${catId}/subcategories`,{name,slug});
+    showToast(`✅ "${name}" added`,'success');
+    await refreshAll();
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+async function deleteSub(subId,catId,name){
+  if(!confirm(`Delete subcategory "${name}"? Items in this subcategory won't be deleted.`))return;
+  try{
+    await API.delete(`/api/subcategories/${subId}`);
+    showToast('Subcategory deleted','success');
+    await refreshAll();
+  }catch(e){ showToast(e.message,'error'); }
+}
+</script>
+</body>
+</html>
