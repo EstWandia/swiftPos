@@ -14,11 +14,11 @@ const pool = mysql.createPool({
 });
 
 console.log('Connecting to MySQL with:', {
-  host: pool.config.connectionConfig.host,
-  port: pool.config.connectionConfig.port,
-  user: pool.config.connectionConfig.user,
-  password: pool.config.connectionConfig.password ? '***' : '(empty)',
-  database: pool.config.connectionConfig.database
+  host:     process.env.DB_HOST     || 'localhost',
+  port:     parseInt(process.env.DB_PORT || '3306'),
+  user:     process.env.DB_USER     || 'root',
+  password: process.env.DB_PASSWORD ? '***' : '(empty)',
+  database: process.env.DB_NAME     || 'swiftposv2',
 });
 
 // READ queries — use text protocol (pool.query) to avoid prepared-statement
