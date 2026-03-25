@@ -30,9 +30,12 @@ function showToast(msg, type = 'info') {
 }
 
 /* ── Formatting ────────────────────────────────────── */
+// function fmt(n) {
+//   const sym = window._currSym || '£';
+//   return sym + parseFloat(n || 0).toFixed(2);
+// }
 function fmt(n) {
-  const sym = window._currSym || '€';
-  return sym + parseFloat(n || 0).toFixed(2);
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(n || 0);
 }
 function fmtDate(s) {
   if (!s) return '—';

@@ -386,7 +386,7 @@ async function loadDaily(){
       return;
     }
     document.getElementById('dailyTbl').innerHTML=rows.map(r=>`<tr>
-      <td><strong>${r.sale_date}</strong></td>
+      <td><strong>${r.sale_date.split('T')[0]}</strong></td>
       <td style="color:var(--t2)">${r.sale_day}</td>
       <td class="mono" style="color:var(--green)">${fmt(r.total_sale)}</td>
       <td class="mono" style="color:var(--a)">${fmt(r.total_profit)}</td>
