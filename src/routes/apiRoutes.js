@@ -74,6 +74,128 @@ router.delete('/subcategories/:id', requireAdmin, async (req, res) => {
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+// ── Analytics ──────────────────────────────────────────────────────────
+ 
+// 1. Daily Report — sale_date, sale_day, total_profit, total_sale, quantity
+router.get('/analytics/daily', requireAdmin, async (req, res) => {
+  try {
+    const { date_from, date_to } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+    const df = date_from || today.slice(0,8) + '01';
+    const dt = date_to   || today;
+    const rows = await query(`
+      SELECT
+        DATE(si.sold_at)                                        AS sale_date,
+        DAYNAME(si.sold_at)                                     AS sale_day,
+        COALESCE(SUM(si.line_total),0)                          AS total_sale,
+        COALESCE(SUM(si.quantity),0)                            AS quantity,
+        COALESCE(SUM(si.line_total - (COALESCE(i.cost_price,0) * si.quantity)),0) AS total_profit,
+        MIN(si.sold_at)                                         AS created_at
+      FROM sold_items si
+      LEFT JOIN items i ON i.id = si.item_id
+      WHERE si.business_id = ?
+        AND DATE(si.sold_at) >= ? AND DATE(si.sold_at) <= ?
+        AND si.state = 0
+      GROUP BY DATE(si.sold_at), DAYNAME(si.sold_at)
+      ORDER BY sale_date DESC
+    `, [bid(req), df, dt]);
+    res.json({ rows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+ 
+// 2. Most Moving — item name, qty sold, profit, created_at
+router.get('/analytics/most-moving', requireAdmin, async (req, res) => {
+  try {
+    const { date_from, date_to, limit = 50 } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+    const df = date_from || today.slice(0,8) + '01';
+    const dt = date_to   || today;
+    const rows = await query(`
+      SELECT
+        si.item_name,
+        si.item_sku,
+        si.category_name,
+        SUM(si.quantity)                                              AS qty_sold,
+        SUM(si.line_total)                                            AS total_sale,
+        SUM(si.line_total - (COALESCE(i.cost_price,0) * si.quantity)) AS profit,
+        MIN(si.sold_at)                                               AS created_at
+      FROM sold_items si
+      LEFT JOIN items i ON i.id = si.item_id
+      WHERE si.business_id = ?
+        AND DATE(si.sold_at) >= ? AND DATE(si.sold_at) <= ?
+        AND si.state = 0
+      GROUP BY si.item_id, si.item_name, si.item_sku, si.category_name
+      ORDER BY qty_sold DESC
+      LIMIT ?
+    `, [bid(req), df, dt, parseInt(limit)]);
+    res.json({ rows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+ 
+// 3. Dead Stock — items never sold or not sold in selected period
+router.get('/analytics/dead-stock', requireAdmin, async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const rows = await query(`
+      SELECT
+        i.name        AS item_name,
+        i.sku         AS item_sku,
+        i.emoji,
+        c.name        AS category_name,
+        i.stock_qty,
+        i.price,
+        MAX(si.sold_at) AS last_sold,
+        i.created_at
+      FROM items i
+      JOIN categories c ON c.id = i.category_id
+      LEFT JOIN sold_items si ON si.item_id = i.id AND si.business_id = i.business_id
+      WHERE i.business_id = ?
+        AND i.is_active = 1
+        AND i.track_stock = 1
+      GROUP BY i.id, i.name, i.sku, i.emoji, c.name, i.stock_qty, i.price, i.created_at
+      HAVING last_sold IS NULL OR last_sold < DATE_SUB(NOW(), INTERVAL ? DAY)
+      ORDER BY last_sold ASC, i.name ASC
+    `, [bid(req), parseInt(days)]);
+    res.json({ rows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+ 
+// 4. Returned Items — orders with status=refunded + sold_items with state=1
+router.get('/analytics/returned', requireAdmin, async (req, res) => {
+  try {
+    const { date_from, date_to } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+    const df = date_from || today.slice(0,8) + '01';
+    const dt = date_to   || today;
+    // Items in refunded orders
+    const rows = await query(`
+      SELECT
+        oi.name        AS item_name,
+        oi.sku         AS item_sku,
+        i.emoji,
+        c.name         AS category_name,
+        oi.quantity,
+        oi.price       AS unit_price,
+        oi.line_total,
+        o.order_number,
+        o.status,
+        u.name         AS cashier_name,
+        o.notes        AS return_reason,
+        o.updated_at   AS returned_at,
+        o.created_at
+      FROM order_items oi
+      JOIN orders o      ON o.id = oi.order_id
+      JOIN items i       ON i.id = oi.item_id
+      JOIN categories c  ON c.id = i.category_id
+      JOIN users u       ON u.id = o.cashier_id
+      WHERE o.business_id = ?
+        AND o.status = 'refunded'
+        AND DATE(o.updated_at) >= ? AND DATE(o.updated_at) <= ?
+      ORDER BY o.updated_at DESC
+    `, [bid(req), df, dt]);
+    res.json({ rows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 
 // ── Items ──────────────────────────────────────────────────────────────
 router.get('/items',          ItemCtrl.getItems);

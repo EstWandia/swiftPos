@@ -6,141 +6,87 @@
 <title>SwiftPOS — Reports</title>
 <link rel="stylesheet" href="/css/main.css">
 <style>
-/* ── Layout: topbar(54px) + page-body(flex:1) + statusbar(30px) ── */
-body {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-  overflow: hidden;
-}
-.page-body {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 16px 16px 48px; /* 48px so content clears the fixed statusbar */
-  -webkit-overflow-scrolling: touch; /* smooth iOS scroll */
-}
+body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+.page-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 16px 48px;-webkit-overflow-scrolling:touch}
 
-/* ── Date range picker row ── */
-.dr {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-.dr-label { font-size: 12px; color: var(--t2); font-weight: 600; white-space: nowrap; }
-.dr input[type=date] {
-  background: var(--s2); border: 1px solid var(--border);
-  border-radius: var(--rs); color: var(--text);
-  font-family: var(--font); font-size: 12px;
-  padding: 7px 10px; outline: none;
-  width: auto; min-width: 0; flex-shrink: 1;
-}
-.dr input[type=date]:focus { border-color: var(--a); }
+/* ── Date row ── */
+.dr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.dr-label{font-size:12px;color:var(--t2);font-weight:600;white-space:nowrap}
+.dr input[type=date]{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-family:var(--font);font-size:12px;padding:7px 10px;outline:none;min-width:0;flex-shrink:1}
+.dr input[type=date]:focus{border-color:var(--a)}
+.quick-btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 
-/* Quick buttons wrap on small screens */
-.quick-btns {
-  display: flex; gap: 6px; flex-wrap: wrap;
-}
+/* ── Analytics dropdown button ── */
+.analytics-wrap{position:relative;display:inline-block}
+.analytics-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--rs);background:linear-gradient(135deg,rgba(108,79,255,.15),rgba(61,139,255,.15));border:1px solid rgba(108,79,255,.4);color:var(--a2);font-size:12.5px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap;transition:all .14s}
+.analytics-btn:hover{background:linear-gradient(135deg,var(--a2),var(--a));color:#fff;border-color:transparent}
+.analytics-btn .arr{font-size:10px;transition:transform .15s}
+.analytics-btn.open .arr{transform:rotate(180deg)}
+.analytics-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:200px;background:var(--s1);border:1px solid var(--border2);border-radius:var(--r);box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:400;opacity:0;pointer-events:none;transform:translateY(-8px);transition:all .18s}
+.analytics-menu.open{opacity:1;pointer-events:all;transform:translateY(0)}
+.am-item{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--t2);transition:background .1s;border-bottom:1px solid var(--border)}
+.am-item:last-child{border:none}
+.am-item:hover{background:var(--s2);color:var(--text)}
+.am-item.active{color:var(--a);background:rgba(61,139,255,.08)}
+.am-icon{font-size:16px;flex-shrink:0}
 
 /* ── Stats grid ── */
-.sg {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
-  margin-bottom: 24px;
-}
-.sc {
-  background: var(--s2); border: 1px solid var(--border);
-  border-radius: var(--r); padding: 14px 16px;
-}
-.sl { font-size: 10px; color: var(--t2); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 7px; }
-.sv { font-size: 24px; font-weight: 800; font-family: var(--mono); }
-.sv.g { color: var(--green); } .sv.b { color: var(--a); } .sv.a { color: var(--amber); }
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:24px}
+.sc{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.sl{font-size:10px;color:var(--t2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px}
+.sv{font-size:24px;font-weight:800;font-family:var(--mono)}
+.sv.g{color:var(--green)}.sv.b{color:var(--a)}.sv.a{color:var(--amber)}
 
 /* ── Section title ── */
-.sec-t {
-  font-size: 14px; font-weight: 700; color: var(--t2);
-  margin: 24px 0 12px; padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
+.sec-t{font-size:14px;font-weight:700;color:var(--t2);margin:24px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.sec-count{font-size:12px;font-weight:600;color:var(--t3);background:var(--s3);padding:2px 8px;border-radius:10px;font-family:var(--mono)}
 
-/* ── Desktop table (hidden on mobile) ── */
-.tbl-wrap { overflow-x: auto; margin-bottom: 8px; }
-table { width: 100%; border-collapse: collapse; }
-th {
-  font-size: 10px; font-weight: 700; color: var(--t3);
-  text-transform: uppercase; letter-spacing: .7px;
-  padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: left;
-  white-space: nowrap;
-}
-td { font-size: 13px; padding: 11px 12px; border-bottom: 1px solid var(--border); }
-tr:hover td { background: var(--s2); }
-.rank {
-  width: 24px; height: 24px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--a), var(--a2));
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: #fff;
-}
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto;margin-bottom:8px;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+td{font-size:13px;padding:11px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+tr:hover td{background:var(--s2)}
+.rank{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--a),var(--a2));display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff}
 
-/* ── Mobile cards (shown only on small screens) ── */
-.mob-cards { display: none; }
+/* ── Mobile cards ── */
+.mob-cards{display:none}
+.m-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px}
+.m-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.m-card-name{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%}
+.m-card-val{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--green);flex-shrink:0}
+.m-card-meta{display:flex;gap:8px;flex-wrap:wrap}
+.m-tag{font-size:11px;color:var(--t2);background:var(--s3);padding:2px 7px;border-radius:6px}
+.m-tag.red{color:var(--red);background:rgba(255,77,106,.1)}
+.m-tag.blue{color:var(--a);background:rgba(61,139,255,.1)}
+.m-tag.amber{color:var(--amber);background:rgba(255,179,71,.1)}
 
-.item-card {
-  background: var(--s2); border: 1px solid var(--border);
-  border-radius: var(--r); padding: 12px 14px;
-  margin-bottom: 8px;
-  display: flex; align-items: center; gap: 12px;
-}
-.item-card-rank {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--a), var(--a2));
-  display: grid; place-items: center;
-  font-size: 12px; font-weight: 800; color: #fff;
-  flex-shrink: 0;
-}
-.item-card-body { flex: 1; min-width: 0; }
-.item-card-name {
-  font-size: 13px; font-weight: 700;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  margin-bottom: 3px;
-}
-.item-card-meta { font-size: 11px; color: var(--t2); }
-.item-card-right { text-align: right; flex-shrink: 0; }
-.item-card-rev { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--green); }
-.item-card-qty { font-size: 11px; color: var(--t3); margin-top: 2px; }
+/* ── Dead stock warning colours ── */
+.never-sold{color:var(--red);font-weight:700}
+.stale{color:var(--amber)}
 
-.cat-card {
-  background: var(--s2); border: 1px solid var(--border);
-  border-radius: var(--r); padding: 12px 14px;
-  margin-bottom: 8px;
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-}
-.cat-card-left { flex: 1; min-width: 0; }
-.cat-card-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
-.cat-card-share {
-  display: inline-block; height: 4px; border-radius: 4px;
-  background: linear-gradient(135deg, var(--a), var(--a2));
-  margin-top: 6px; max-width: 100%;
-}
-.cat-card-right { text-align: right; flex-shrink: 0; }
-.cat-card-rev { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--green); }
-.cat-card-qty { font-size: 11px; color: var(--t3); margin-top: 2px; }
-.cat-card-pct { font-size: 11px; color: var(--t2); margin-top: 2px; }
+/* ── Analytics panel ── */
+.analytics-panel{display:none}
+.analytics-panel.active{display:block}
+.analytics-header{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.back-btn{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:var(--rs);border:1px solid var(--border);background:var(--s2);color:var(--t2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .14s}
+.back-btn:hover{border-color:var(--a);color:var(--a)}
+.panel-title{font-size:18px;font-weight:800}
 
-/* ── Responsive switchover ── */
-@media (max-width: 600px) {
-  .tbl-wrap { display: none; }          /* hide table */
-  .mob-cards { display: block; }        /* show cards */
+/* Days filter for dead stock */
+.days-sel{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-family:var(--font);font-size:12px;padding:7px 10px;outline:none;cursor:pointer}
+.days-sel:focus{border-color:var(--a)}
 
-  .sg { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .sc { padding: 11px 12px; }
-  .sv { font-size: 20px; }
-
-  .dr { gap: 6px; }
-  .dr input[type=date] { font-size: 11px; padding: 6px 8px; }
-  .quick-btns .btn { padding: 7px 10px; font-size: 11px; }
+/* ── Responsive ── */
+@media(max-width:600px){
+  .tbl-wrap{display:none}
+  .mob-cards{display:block}
+  .sg{grid-template-columns:repeat(2,1fr);gap:8px}
+  .sc{padding:11px 12px}
+  .sv{font-size:20px}
+  .dr{gap:6px}
+  .dr input[type=date]{font-size:11px;padding:6px 8px}
+  .analytics-menu{right:0;left:auto;min-width:180px}
 }
 </style>
 </head>
@@ -155,58 +101,135 @@ tr:hover td { background: var(--s2); }
 </header>
 
 <div class="page-body">
-  <h2 style="font-size:18px;margin-bottom:14px">📊 Sales Reports</h2>
 
-  <!-- Date range row -->
-  <div class="dr">
-    <span class="dr-label">Period:</span>
-    <input type="date" id="rFrom">
-    <span style="color:var(--t2);font-size:13px">→</span>
-    <input type="date" id="rTo">
-    <div class="quick-btns">
-      <button class="btn btn-primary" onclick="loadReport()">Load</button>
-      <button class="btn btn-ghost" onclick="setQuick('today')">Today</button>
-      <button class="btn btn-ghost" onclick="setQuick('week')">Week</button>
-      <button class="btn btn-ghost" onclick="setQuick('month')">Month</button>
+  <!-- ══════════════════════════════
+       MAIN REPORTS VIEW
+  ══════════════════════════════ -->
+  <div id="mainView">
+    <h2 style="font-size:18px;margin-bottom:14px">📊 Sales Reports</h2>
+
+    <div class="dr">
+      <span class="dr-label">Period:</span>
+      <input type="date" id="rFrom">
+      <span style="color:var(--t2);font-size:13px">→</span>
+      <input type="date" id="rTo">
+      <div class="quick-btns">
+        <button class="btn btn-primary" onclick="loadReport()">Load</button>
+        <button class="btn btn-ghost" onclick="setQuick('today')">Today</button>
+        <button class="btn btn-ghost" onclick="setQuick('week')">Week</button>
+        <button class="btn btn-ghost" onclick="setQuick('month')">Month</button>
+
+        <!-- Analytics dropdown -->
+        <div class="analytics-wrap">
+          <button class="analytics-btn" id="analyticsBtn" onclick="toggleAnalyticsMenu()">
+            📈 Analytics <span class="arr">▼</span>
+          </button>
+          <div class="analytics-menu" id="analyticsMenu">
+            <div class="am-item" onclick="openAnalytics('daily')"><span class="am-icon">📅</span> Daily Report</div>
+            <div class="am-item" onclick="openAnalytics('moving')"><span class="am-icon">🚀</span> Most Moving</div>
+            <div class="am-item" onclick="openAnalytics('dead')"><span class="am-icon">📦</span> Dead Stock</div>
+            <div class="am-item" onclick="openAnalytics('returned')"><span class="am-icon">↩️</span> Returned Items</div>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- Stats -->
+    <div class="sg" id="statsGrid"><div class="spinner"></div></div>
+
+    <!-- Top selling -->
+    <div class="sec-t">🏆 Top Selling Items <span class="sec-count" id="topCount">—</span></div>
+    <div class="tbl-wrap">
+      <table><thead><tr><th>#</th><th>Item</th><th>Category</th><th>Qty Sold</th><th>Revenue</th></tr></thead>
+      <tbody id="topItemsTbl"></tbody></table>
+    </div>
+    <div class="mob-cards" id="topItemsCards"></div>
+
+    <!-- Category breakdown -->
+    <div class="sec-t">📂 Revenue by Category <span class="sec-count" id="catCount">—</span></div>
+    <div class="tbl-wrap">
+      <table><thead><tr><th>Category</th><th>Qty Sold</th><th>Revenue</th><th>Share</th></tr></thead>
+      <tbody id="catBreakTbl"></tbody></table>
+    </div>
+    <div class="mob-cards" id="catBreakCards"></div>
   </div>
 
-  <!-- Stats cards -->
-  <div class="sg" id="statsGrid"><div class="spinner"></div></div>
+  <!-- ══════════════════════════════
+       ANALYTICS SUB-PANELS
+  ══════════════════════════════ -->
 
-  <!-- Top selling items -->
-  <div class="sec-t">🏆 Top Selling Items</div>
-
-  <!-- Desktop table -->
-  <div class="tbl-wrap">
-    <table>
-      <thead>
-        <tr><th>#</th><th>Item</th><th>Category</th><th>Qty Sold</th><th>Revenue</th></tr>
-      </thead>
-      <tbody id="topItemsTbl"></tbody>
-    </table>
+  <!-- 1. Daily Report -->
+  <div id="panelDaily" class="analytics-panel">
+    <div class="analytics-header">
+      <button class="back-btn" onclick="closeAnalytics()">← Back</button>
+      <div class="panel-title">📅 Daily Report</div>
+      <span id="dailyRange" style="font-size:12px;color:var(--t2)"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Sale Date</th><th>Day</th><th>Total Sale</th><th>Total Profit</th><th>Qty</th><th>First Sale</th></tr></thead>
+        <tbody id="dailyTbl"></tbody>
+      </table>
+    </div>
+    <div class="mob-cards" id="dailyCards"></div>
   </div>
 
-  <!-- Mobile cards -->
-  <div class="mob-cards" id="topItemsCards"></div>
-
-  <!-- Revenue by category -->
-  <div class="sec-t">📂 Revenue by Category</div>
-
-  <!-- Desktop table -->
-  <div class="tbl-wrap">
-    <table>
-      <thead>
-        <tr><th>Category</th><th>Qty Sold</th><th>Revenue</th><th>Share</th></tr>
-      </thead>
-      <tbody id="catBreakTbl"></tbody>
-    </table>
+  <!-- 2. Most Moving -->
+  <div id="panelMoving" class="analytics-panel">
+    <div class="analytics-header">
+      <button class="back-btn" onclick="closeAnalytics()">← Back</button>
+      <div class="panel-title">🚀 Most Moving Items</div>
+      <span id="movingRange" style="font-size:12px;color:var(--t2)"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Item Name</th><th>Category</th><th>Qty Sold</th><th>Revenue</th><th>Profit</th><th>Created At</th></tr></thead>
+        <tbody id="movingTbl"></tbody>
+      </table>
+    </div>
+    <div class="mob-cards" id="movingCards"></div>
   </div>
 
-  <!-- Mobile cards -->
-  <div class="mob-cards" id="catBreakCards"></div>
+  <!-- 3. Dead Stock -->
+  <div id="panelDead" class="analytics-panel">
+    <div class="analytics-header">
+      <button class="back-btn" onclick="closeAnalytics()">← Back</button>
+      <div class="panel-title">📦 Dead Stock</div>
+      <select class="days-sel" id="deadDays" onchange="loadDead()">
+        <option value="7">Not sold in 7 days</option>
+        <option value="14">Not sold in 14 days</option>
+        <option value="30" selected>Not sold in 30 days</option>
+        <option value="60">Not sold in 60 days</option>
+        <option value="90">Not sold in 90 days</option>
+        <option value="999">Never sold</option>
+      </select>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Item</th><th>Category</th><th>Stock Qty</th><th>Price</th><th>Last Sold</th><th>Created At</th></tr></thead>
+        <tbody id="deadTbl"></tbody>
+      </table>
+    </div>
+    <div class="mob-cards" id="deadCards"></div>
+  </div>
 
-</div>
+  <!-- 4. Returned Items -->
+  <div id="panelReturned" class="analytics-panel">
+    <div class="analytics-header">
+      <button class="back-btn" onclick="closeAnalytics()">← Back</button>
+      <div class="panel-title">↩️ Returned Items</div>
+      <span id="returnedRange" style="font-size:12px;color:var(--t2)"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Item</th><th>Order No.</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Cashier</th><th>Reason</th><th>Returned At</th></tr></thead>
+        <tbody id="returnedTbl"></tbody>
+      </table>
+    </div>
+    <div class="mob-cards" id="returnedCards"></div>
+  </div>
+
+</div><!-- end page-body -->
 
 <div class="statusbar">
   <span><span class="dot"></span>Online</span>
@@ -215,127 +238,285 @@ tr:hover td { background: var(--s2); }
 <div id="toast"></div>
 <script src="/js/api.js"></script>
 <script>
+/* ── Init ── */
 (async function(){
-  try {
-    const { user } = await API.get('/api/me');
-    document.getElementById('userAvatar').textContent = user.name.slice(0,2).toUpperCase();
-    document.getElementById('bizName').textContent    = user.business?.name || 'SwiftPOS';
-    window._currSym = user.business?.currency_sym || '€';
-    buildNav(user.role, '/reports');
-  } catch { window.location.href = '/login'; return; }
+  try{
+    const{user}=await API.get('/api/me');
+    document.getElementById('userAvatar').textContent=user.name.slice(0,2).toUpperCase();
+    document.getElementById('bizName').textContent=user.business?.name||'SwiftPOS';
+    window._currSym=user.business?.currency_sym||'€';
+    buildNav(user.role,'/reports');
+  }catch{ window.location.href='/login'; return; }
   startClock('clock');
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('rFrom').value = today.slice(0,8) + '01';
-  document.getElementById('rTo').value   = today;
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('rFrom').value=today.slice(0,8)+'01';
+  document.getElementById('rTo').value=today;
   loadReport();
 })();
 
-function setQuick(p) {
-  const t = new Date(), y = d => d.toISOString().split('T')[0];
-  if (p === 'today') {
-    document.getElementById('rFrom').value = y(t);
-    document.getElementById('rTo').value   = y(t);
-  } else if (p === 'week') {
-    const d = new Date(t); d.setDate(t.getDate() - t.getDay());
-    document.getElementById('rFrom').value = y(d);
-    document.getElementById('rTo').value   = y(t);
-  } else if (p === 'month') {
-    document.getElementById('rFrom').value = y(t).slice(0,8) + '01';
-    document.getElementById('rTo').value   = y(t);
-  }
+/* ── Quick date shortcuts ── */
+function setQuick(p){
+  const t=new Date(), y=d=>d.toISOString().split('T')[0];
+  if(p==='today'){ document.getElementById('rFrom').value=y(t); document.getElementById('rTo').value=y(t); }
+  else if(p==='week'){ const d=new Date(t); d.setDate(t.getDate()-t.getDay()); document.getElementById('rFrom').value=y(d); document.getElementById('rTo').value=y(t); }
+  else if(p==='month'){ document.getElementById('rFrom').value=y(t).slice(0,8)+'01'; document.getElementById('rTo').value=y(t); }
   loadReport();
 }
 
-async function loadReport() {
-  const df = document.getElementById('rFrom').value;
-  const dt = document.getElementById('rTo').value;
-  document.getElementById('statsGrid').innerHTML = '<div class="spinner"></div>';
-  try {
-    const { summary, topItems, catBreakdown } = await API.get(
-      `/api/orders/summary/today?date_from=${df}&date_to=${dt}`
-    );
+/* ── Main report ── */
+async function loadReport(){
+  const df=document.getElementById('rFrom').value;
+  const dt=document.getElementById('rTo').value;
+  document.getElementById('statsGrid').innerHTML='<div class="spinner"></div>';
+  try{
+    const{summary,topItems,catBreakdown}=await API.get(`/api/orders/summary/today?date_from=${df}&date_to=${dt}`);
 
-    // ── Stats ──────────────────────────────────────────────────────────
-    document.getElementById('statsGrid').innerHTML = `
-      <div class="sc"><div class="sl">Orders</div><div class="sv b">${summary.order_count || 0}</div></div>
-      <div class="sc"><div class="sl">Revenue</div><div class="sv g">${fmt(summary.revenue || 0)}</div></div>
-      <div class="sc"><div class="sl">Tax</div><div class="sv">${fmt(summary.tax_collected || 0)}</div></div>
-      <div class="sc"><div class="sl">Discounts</div><div class="sv a">${fmt(summary.discounts_given || 0)}</div></div>
-      <div class="sc"><div class="sl">Avg. Order</div><div class="sv">${fmt(summary.avg_order_value || 0)}</div></div>`;
+    document.getElementById('statsGrid').innerHTML=`
+      <div class="sc"><div class="sl">Orders</div><div class="sv b">${summary.order_count||0}</div></div>
+      <div class="sc"><div class="sl">Revenue</div><div class="sv g">${fmt(summary.revenue||0)}</div></div>
+      <div class="sc"><div class="sl">Tax</div><div class="sv">${fmt(summary.tax_collected||0)}</div></div>
+      <div class="sc"><div class="sl">Discounts</div><div class="sv a">${fmt(summary.discounts_given||0)}</div></div>
+      <div class="sc"><div class="sl">Avg. Order</div><div class="sv">${fmt(summary.avg_order_value||0)}</div></div>`;
 
-    // ── Top items — table rows ─────────────────────────────────────────
-    const topList = topItems || [];
-    document.getElementById('topItemsTbl').innerHTML = topList.length
-      ? topList.map((it, i) => `
-          <tr>
-            <td><span class="rank">${i+1}</span></td>
-            <td><span style="font-size:16px">${it.emoji||'🛒'}</span>
-                <strong>${it.name}</strong>
-                <span style="font-size:10px;color:var(--t3);margin-left:4px">${it.sku}</span></td>
-            <td><span class="badge badge-blue">${it.category}</span></td>
-            <td class="mono">${it.total_qty}</td>
-            <td class="mono" style="color:var(--green)">${fmt(it.total_revenue)}</td>
-          </tr>`).join('')
-      : '<tr><td colspan="5"><div class="empty-state" style="padding:20px"><p>No sales data for this period</p></div></td></tr>';
+    const topList=topItems||[];
+    document.getElementById('topCount').textContent=topList.length;
+    document.getElementById('topItemsTbl').innerHTML=topList.length
+      ?topList.map((it,i)=>`<tr>
+          <td><span class="rank">${i+1}</span></td>
+          <td><span style="font-size:15px">${it.emoji||'🛒'}</span> <strong>${it.name}</strong> <span style="font-size:10px;color:var(--t3)">${it.sku}</span></td>
+          <td><span class="badge badge-blue">${it.category}</span></td>
+          <td class="mono">${it.total_qty}</td>
+          <td class="mono" style="color:var(--green)">${fmt(it.total_revenue)}</td></tr>`).join('')
+      :'<tr><td colspan="5"><div class="empty-state" style="padding:20px"><p>No data for this period</p></div></td></tr>';
+    document.getElementById('topItemsCards').innerHTML=topList.length
+      ?topList.map((it,i)=>`<div class="m-card">
+          <div class="m-card-top">
+            <div class="m-card-name">${it.emoji||'🛒'} ${it.name}</div>
+            <div class="m-card-val">${fmt(it.total_revenue)}</div>
+          </div>
+          <div class="m-card-meta">
+            <span class="m-tag">#${i+1}</span>
+            <span class="m-tag blue">${it.category}</span>
+            <span class="m-tag">${it.total_qty} sold</span>
+          </div></div>`).join('')
+      :'<div class="empty-state" style="padding:20px"><p>No data</p></div>';
 
-    // ── Top items — mobile cards ───────────────────────────────────────
-    document.getElementById('topItemsCards').innerHTML = topList.length
-      ? topList.map((it, i) => `
-          <div class="item-card">
-            <div class="item-card-rank">${i+1}</div>
-            <div class="item-card-body">
-              <div class="item-card-name">${it.emoji||'🛒'} ${it.name}</div>
-              <div class="item-card-meta">
-                <span class="badge badge-blue" style="font-size:10px">${it.category}</span>
-                &nbsp;${it.sku}
-              </div>
-            </div>
-            <div class="item-card-right">
-              <div class="item-card-rev">${fmt(it.total_revenue)}</div>
-              <div class="item-card-qty">${it.total_qty} sold</div>
-            </div>
-          </div>`).join('')
-      : '<div class="empty-state" style="padding:20px"><p>No sales data for this period</p></div>';
+    const catList=catBreakdown||[];
+    const totalRev=catList.reduce((s,c)=>s+parseFloat(c.revenue||0),0);
+    document.getElementById('catCount').textContent=catList.length;
+    document.getElementById('catBreakTbl').innerHTML=catList.length
+      ?catList.map(c=>`<tr>
+          <td><strong>${c.category_name}</strong></td>
+          <td class="mono">${c.qty_sold}</td>
+          <td class="mono" style="color:var(--green)">${fmt(c.revenue)}</td>
+          <td>${totalRev>0?((parseFloat(c.revenue)/totalRev)*100).toFixed(1)+'%':'—'}</td></tr>`).join('')
+      :'<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>No data</p></div></td></tr>';
+    document.getElementById('catBreakCards').innerHTML=catList.length
+      ?catList.map(c=>{
+          const pct=totalRev>0?((parseFloat(c.revenue)/totalRev)*100).toFixed(1):0;
+          const w=totalRev>0?Math.round((parseFloat(c.revenue)/totalRev)*100):0;
+          return `<div class="m-card">
+            <div class="m-card-top"><div class="m-card-name">${c.category_name}</div><div class="m-card-val">${fmt(c.revenue)}</div></div>
+            <div style="height:4px;border-radius:4px;background:linear-gradient(135deg,var(--a),var(--a2));width:${w}%;margin:6px 0"></div>
+            <div class="m-card-meta"><span class="m-tag">${c.qty_sold} items</span><span class="m-tag blue">${pct}%</span></div>
+          </div>`;}).join('')
+      :'<div class="empty-state" style="padding:20px"><p>No data</p></div>';
+  }catch(e){ showToast(e.message,'error'); document.getElementById('statsGrid').innerHTML=`<p style="color:var(--red);padding:10px">${e.message}</p>`; }
+}
 
-    // ── Category breakdown ─────────────────────────────────────────────
-    const catList  = catBreakdown || [];
-    const totalRev = catList.reduce((s,c) => s + parseFloat(c.revenue || 0), 0);
-
-    document.getElementById('catBreakTbl').innerHTML = catList.length
-      ? catList.map(c => `
-          <tr>
-            <td><strong>${c.category_name}</strong></td>
-            <td class="mono">${c.qty_sold}</td>
-            <td class="mono" style="color:var(--green)">${fmt(c.revenue)}</td>
-            <td>${totalRev > 0 ? ((parseFloat(c.revenue)/totalRev)*100).toFixed(1)+'%' : '—'}</td>
-          </tr>`).join('')
-      : '<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>No data</p></div></td></tr>';
-
-    // ── Category breakdown — mobile cards ─────────────────────────────
-    document.getElementById('catBreakCards').innerHTML = catList.length
-      ? catList.map(c => {
-          const pct = totalRev > 0 ? ((parseFloat(c.revenue)/totalRev)*100).toFixed(1) : 0;
-          const barW = totalRev > 0 ? Math.round((parseFloat(c.revenue)/totalRev)*100) : 0;
-          return `
-          <div class="cat-card">
-            <div class="cat-card-left">
-              <div class="cat-card-name">${c.category_name}</div>
-              <div class="cat-card-share" style="width:${barW}%"></div>
-            </div>
-            <div class="cat-card-right">
-              <div class="cat-card-rev">${fmt(c.revenue)}</div>
-              <div class="cat-card-qty">${c.qty_sold} items</div>
-              <div class="cat-card-pct">${pct}%</div>
-            </div>
-          </div>`;
-        }).join('')
-      : '<div class="empty-state" style="padding:20px"><p>No data</p></div>';
-
-  } catch(e) {
-    showToast(e.message, 'error');
-    document.getElementById('statsGrid').innerHTML =
-      `<p style="color:var(--red);padding:10px">${e.message}</p>`;
+/* ── Analytics menu ── */
+function toggleAnalyticsMenu(){
+  const btn=document.getElementById('analyticsBtn');
+  const menu=document.getElementById('analyticsMenu');
+  btn.classList.toggle('open');
+  menu.classList.toggle('open');
+}
+// Close menu on outside click
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.analytics-wrap')){
+    document.getElementById('analyticsBtn')?.classList.remove('open');
+    document.getElementById('analyticsMenu')?.classList.remove('open');
   }
+});
+
+let currentPanel=null;
+
+function openAnalytics(type){
+  // Close menu
+  document.getElementById('analyticsBtn').classList.remove('open');
+  document.getElementById('analyticsMenu').classList.remove('open');
+  // Mark active
+  document.querySelectorAll('.am-item').forEach(el=>el.classList.remove('active'));
+  document.querySelector(`.am-item[onclick*="${type}"]`)?.classList.add('active');
+  // Hide main, show panel
+  document.getElementById('mainView').style.display='none';
+  document.querySelectorAll('.analytics-panel').forEach(p=>p.classList.remove('active'));
+  currentPanel=type;
+  // Load data
+  if(type==='daily')    loadDaily();
+  else if(type==='moving') loadMoving();
+  else if(type==='dead')   loadDead();
+  else if(type==='returned') loadReturned();
+}
+
+function closeAnalytics(){
+  document.getElementById('mainView').style.display='';
+  document.querySelectorAll('.analytics-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.am-item').forEach(el=>el.classList.remove('active'));
+  currentPanel=null;
+}
+
+/* helpers */
+function getDF(){ return document.getElementById('rFrom').value; }
+function getDT(){ return document.getElementById('rTo').value; }
+function rangeLabel(){ return `${getDF()} → ${getDT()}`; }
+function dateStr(s){ return s?new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'Never'; }
+
+/* ── 1. Daily Report ── */
+async function loadDaily(){
+  document.getElementById('panelDaily').classList.add('active');
+  document.getElementById('dailyRange').textContent=rangeLabel();
+  document.getElementById('dailyTbl').innerHTML='<tr><td colspan="6"><div class="spinner"></div></td></tr>';
+  document.getElementById('dailyCards').innerHTML='';
+  try{
+    const{rows}=await API.get(`/api/analytics/daily?date_from=${getDF()}&date_to=${getDT()}`);
+    if(!rows.length){
+      document.getElementById('dailyTbl').innerHTML='<tr><td colspan="6"><div class="empty-state" style="padding:20px"><p>No sales in this period</p></div></td></tr>';
+      document.getElementById('dailyCards').innerHTML='<div class="empty-state" style="padding:20px"><p>No sales in this period</p></div>';
+      return;
+    }
+    document.getElementById('dailyTbl').innerHTML=rows.map(r=>`<tr>
+      <td><strong>${r.sale_date}</strong></td>
+      <td style="color:var(--t2)">${r.sale_day}</td>
+      <td class="mono" style="color:var(--green)">${fmt(r.total_sale)}</td>
+      <td class="mono" style="color:var(--a)">${fmt(r.total_profit)}</td>
+      <td class="mono">${r.quantity}</td>
+      <td style="color:var(--t3);font-size:11px">${dateStr(r.created_at)}</td>
+    </tr>`).join('');
+    document.getElementById('dailyCards').innerHTML=rows.map(r=>`<div class="m-card">
+      <div class="m-card-top">
+        <div class="m-card-name">${r.sale_date} <span style="color:var(--t3);font-weight:400;font-size:11px">${r.sale_day}</span></div>
+        <div class="m-card-val">${fmt(r.total_sale)}</div>
+      </div>
+      <div class="m-card-meta">
+        <span class="m-tag blue">Profit: ${fmt(r.total_profit)}</span>
+        <span class="m-tag">${r.quantity} items sold</span>
+      </div></div>`).join('');
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+/* ── 2. Most Moving ── */
+async function loadMoving(){
+  document.getElementById('panelMoving').classList.add('active');
+  document.getElementById('movingRange').textContent=rangeLabel();
+  document.getElementById('movingTbl').innerHTML='<tr><td colspan="7"><div class="spinner"></div></td></tr>';
+  document.getElementById('movingCards').innerHTML='';
+  try{
+    const{rows}=await API.get(`/api/analytics/most-moving?date_from=${getDF()}&date_to=${getDT()}`);
+    if(!rows.length){
+      document.getElementById('movingTbl').innerHTML='<tr><td colspan="7"><div class="empty-state" style="padding:20px"><p>No sales in this period</p></div></td></tr>';
+      document.getElementById('movingCards').innerHTML='<div class="empty-state" style="padding:20px"><p>No sales in this period</p></div>';
+      return;
+    }
+    document.getElementById('movingTbl').innerHTML=rows.map((r,i)=>`<tr>
+      <td><span class="rank">${i+1}</span></td>
+      <td><strong>${r.item_name}</strong> <span style="font-size:10px;color:var(--t3)">${r.item_sku}</span></td>
+      <td><span class="badge badge-blue">${r.category_name}</span></td>
+      <td class="mono">${r.qty_sold}</td>
+      <td class="mono" style="color:var(--green)">${fmt(r.total_sale)}</td>
+      <td class="mono" style="color:var(--a)">${fmt(r.profit)}</td>
+      <td style="color:var(--t3);font-size:11px">${dateStr(r.created_at)}</td>
+    </tr>`).join('');
+    document.getElementById('movingCards').innerHTML=rows.map((r,i)=>`<div class="m-card">
+      <div class="m-card-top">
+        <div class="m-card-name">${r.item_name}</div>
+        <div class="m-card-val">${fmt(r.total_sale)}</div>
+      </div>
+      <div class="m-card-meta">
+        <span class="m-tag">#${i+1}</span>
+        <span class="m-tag blue">${r.category_name}</span>
+        <span class="m-tag">${r.qty_sold} sold</span>
+        <span class="m-tag amber">Profit: ${fmt(r.profit)}</span>
+      </div></div>`).join('');
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+/* ── 3. Dead Stock ── */
+async function loadDead(){
+  document.getElementById('panelDead').classList.add('active');
+  const days=document.getElementById('deadDays').value;
+  document.getElementById('deadTbl').innerHTML='<tr><td colspan="6"><div class="spinner"></div></td></tr>';
+  document.getElementById('deadCards').innerHTML='';
+  try{
+    const{rows}=await API.get(`/api/analytics/dead-stock?days=${days}`);
+    if(!rows.length){
+      document.getElementById('deadTbl').innerHTML='<tr><td colspan="6"><div class="empty-state" style="padding:20px"><p>No dead stock found 🎉</p></div></td></tr>';
+      document.getElementById('deadCards').innerHTML='<div class="empty-state" style="padding:20px"><p>No dead stock found 🎉</p></div>';
+      return;
+    }
+    document.getElementById('deadTbl').innerHTML=rows.map(r=>{
+      const neverSold=!r.last_sold;
+      const cls=neverSold?'never-sold':'stale';
+      return `<tr>
+        <td><span style="font-size:15px">${r.emoji||'🛒'}</span> <strong>${r.item_name}</strong> <span style="font-size:10px;color:var(--t3)">${r.item_sku}</span></td>
+        <td><span class="badge badge-blue">${r.category_name}</span></td>
+        <td class="mono">${r.stock_qty}</td>
+        <td class="mono">${fmt(r.price)}</td>
+        <td class="${cls}">${neverSold?'Never sold':dateStr(r.last_sold)}</td>
+        <td style="color:var(--t3);font-size:11px">${dateStr(r.created_at)}</td>
+      </tr>`;}).join('');
+    document.getElementById('deadCards').innerHTML=rows.map(r=>{
+      const neverSold=!r.last_sold;
+      return `<div class="m-card">
+        <div class="m-card-top">
+          <div class="m-card-name">${r.emoji||'🛒'} ${r.item_name}</div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--t2)">${fmt(r.price)}</div>
+        </div>
+        <div class="m-card-meta">
+          <span class="m-tag blue">${r.category_name}</span>
+          <span class="m-tag">Stock: ${r.stock_qty}</span>
+          <span class="m-tag ${neverSold?'red':'amber'}">${neverSold?'Never sold':'Last: '+dateStr(r.last_sold)}</span>
+        </div></div>`;}).join('');
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+/* ── 4. Returned Items ── */
+async function loadReturned(){
+  document.getElementById('panelReturned').classList.add('active');
+  document.getElementById('returnedRange').textContent=rangeLabel();
+  document.getElementById('returnedTbl').innerHTML='<tr><td colspan="8"><div class="spinner"></div></td></tr>';
+  document.getElementById('returnedCards').innerHTML='';
+  try{
+    const{rows}=await API.get(`/api/analytics/returned?date_from=${getDF()}&date_to=${getDT()}`);
+    if(!rows.length){
+      document.getElementById('returnedTbl').innerHTML='<tr><td colspan="8"><div class="empty-state" style="padding:20px"><p>No returned items in this period</p></div></td></tr>';
+      document.getElementById('returnedCards').innerHTML='<div class="empty-state" style="padding:20px"><p>No returned items in this period</p></div>';
+      return;
+    }
+    document.getElementById('returnedTbl').innerHTML=rows.map(r=>`<tr>
+      <td><span style="font-size:15px">${r.emoji||'🛒'}</span> <strong>${r.item_name}</strong> <span style="font-size:10px;color:var(--t3)">${r.item_sku}</span></td>
+      <td class="mono" style="color:var(--a)">${r.order_number}</td>
+      <td class="mono">${r.quantity}</td>
+      <td class="mono">${fmt(r.unit_price)}</td>
+      <td class="mono" style="color:var(--red)">${fmt(r.line_total)}</td>
+      <td>${r.cashier_name}</td>
+      <td style="color:var(--t2);font-size:12px">${r.return_reason||'—'}</td>
+      <td style="color:var(--t3);font-size:11px">${dateStr(r.returned_at)}</td>
+    </tr>`).join('');
+    document.getElementById('returnedCards').innerHTML=rows.map(r=>`<div class="m-card">
+      <div class="m-card-top">
+        <div class="m-card-name">${r.emoji||'🛒'} ${r.item_name}</div>
+        <div class="m-card-val" style="color:var(--red)">${fmt(r.line_total)}</div>
+      </div>
+      <div class="m-card-meta">
+        <span class="m-tag blue">${r.order_number}</span>
+        <span class="m-tag">${r.quantity} units</span>
+        <span class="m-tag amber">${r.cashier_name}</span>
+      </div>
+      ${r.return_reason?`<div style="font-size:11px;color:var(--t2);margin-top:6px">Reason: ${r.return_reason}</div>`:''}
+      <div style="font-size:10px;color:var(--t3);margin-top:4px">${dateStr(r.returned_at)}</div>
+    </div>`).join('');
+  }catch(e){ showToast(e.message,'error'); }
 }
 </script>
 </body>
