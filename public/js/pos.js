@@ -293,17 +293,7 @@ function closeMobSearch(e) {
   if (!mobVal) { searchQuery = ''; loadProducts(); }
 }
 
-function scanMode() {
-  const sku = prompt('Scan or enter SKU / barcode:');
-  if (!sku) return;
-  API.get(`/api/items/sku/${encodeURIComponent(sku.trim())}`).then(({ item }) => {
-    if (item) {
-      const ep = item.on_sale && item.sale_price ? parseFloat(item.sale_price) : parseFloat(item.price);
-      addToCart({ id:item.id, name:item.name, sku:item.sku, emoji:item.emoji, price:ep, tax_rate:item.tax_rate||10 });
-      showToast(`📷 ${item.name} scanned`, 'success');
-    } else showToast('Item not found', 'error');
-  }).catch(() => showToast('Item not found', 'error'));
-}
+// scanMode() is defined in scanner.js
 
 function setView(v) {
   viewMode = v;

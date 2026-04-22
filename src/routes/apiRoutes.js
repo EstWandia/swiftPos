@@ -14,7 +14,7 @@ router.get('/me', (req, res) => res.json({ user: req.session.user }));
 
 // ── Categories ─────────────────────────────────────────────────────────
 router.get('/categories', ItemCtrl.getCategories);
- 
+
 router.post('/categories', requireAdmin, async (req, res) => {
   try {
     const { name, slug, emoji='🏷️', description=null, sort_order=0 } = req.body;
@@ -29,7 +29,7 @@ router.post('/categories', requireAdmin, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
- 
+
 router.put('/categories/:id', requireAdmin, async (req, res) => {
   try {
     const { name, slug, emoji='🏷️', description=null, sort_order=0, is_active=1 } = req.body;
@@ -41,14 +41,14 @@ router.put('/categories/:id', requireAdmin, async (req, res) => {
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 router.delete('/categories/:id', requireAdmin, async (req, res) => {
   try {
     await run('UPDATE categories SET is_active=0 WHERE id=? AND business_id=?', [req.params.id, bid(req)]);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // ── Subcategories ───────────────────────────────────────────────────────
 router.post('/categories/:catId/subcategories', requireAdmin, async (req, res) => {
   try {
@@ -67,42 +67,134 @@ router.post('/categories/:catId/subcategories', requireAdmin, async (req, res) =
     res.status(500).json({ error: e.message });
   }
 });
- 
+
 router.delete('/subcategories/:id', requireAdmin, async (req, res) => {
   try {
     await run('UPDATE subcategories SET is_active=0 WHERE id=? AND business_id=?', [req.params.id, bid(req)]);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+
 // ── Analytics ──────────────────────────────────────────────────────────
- 
-// 1. Daily Report — sale_date, sale_day, total_profit, total_sale, quantity
+
+// 1. Daily Report — fixed daily expenditure auto-applied to every day
 router.get('/analytics/daily', requireAdmin, async (req, res) => {
   try {
     const { date_from, date_to } = req.query;
     const today = new Date().toISOString().split('T')[0];
     const df = date_from || today.slice(0,8) + '01';
     const dt = date_to   || today;
+
+    // Sum all active fixed daily costs for this business
+    const expRow = await queryOne(
+      `SELECT COALESCE(SUM(daily_amount), 0) AS fixed_daily
+       FROM recurring_expenditures
+       WHERE business_id = ? AND is_active = 1`,
+      [bid(req)]
+    );
+    const fixedDaily = parseFloat(expRow?.fixed_daily || 0);
+
+    // NOTE: Join through order_items → orders so we can filter out refunded orders reliably.
+    // We do NOT use si.state (column may not exist in older installs).
+    // gross_profit = revenue − cost_of_goods. If cost_price is NULL, we treat margin as 100%
+    // (i.e. full line_total is profit) so the number is always meaningful.
     const rows = await query(`
       SELECT
-        DATE(si.sold_at)                                        AS sale_date,
-        DAYNAME(si.sold_at)                                     AS sale_day,
-        COALESCE(SUM(si.line_total),0)                          AS total_sale,
-        COALESCE(SUM(si.quantity),0)                            AS quantity,
-        COALESCE(SUM(si.line_total - (COALESCE(i.cost_price,0) * si.quantity)),0) AS total_profit,
-        MIN(si.sold_at)                                         AS created_at
+        DATE(si.sold_at)                                                AS sale_date,
+        DAYNAME(si.sold_at)                                             AS sale_day,
+        CAST(COALESCE(SUM(si.line_total), 0) AS DECIMAL(12,2))         AS total_sale,
+        CAST(COALESCE(SUM(si.quantity), 0) AS UNSIGNED)                AS quantity,
+        CAST(COALESCE(
+          SUM(
+            si.line_total -
+            (COALESCE(i.cost_price, si.unit_price * 0.6) * si.quantity)
+          ), 0
+        ) AS DECIMAL(12,2))                                            AS gross_profit,
+        MIN(si.sold_at)                                                 AS created_at
       FROM sold_items si
-      LEFT JOIN items i ON i.id = si.item_id
+      LEFT JOIN items i ON i.id = si.item_id AND i.business_id = si.business_id
+      LEFT JOIN orders o ON o.id = si.order_id
       WHERE si.business_id = ?
         AND DATE(si.sold_at) >= ? AND DATE(si.sold_at) <= ?
-        AND si.state = 0
+        AND (o.status IS NULL OR o.status NOT IN ('refunded', 'cancelled'))
       GROUP BY DATE(si.sold_at), DAYNAME(si.sold_at)
       ORDER BY sale_date DESC
     `, [bid(req), df, dt]);
-    res.json({ rows });
+
+    // Attach fixed daily expenditure and calculate net profit per row
+    const result = rows.map(r => ({
+      ...r,
+      total_sale:        parseFloat(r.total_sale)    || 0,
+      gross_profit:      parseFloat(r.gross_profit)  || 0,
+      quantity:          parseInt(r.quantity)         || 0,
+      total_expenditure: fixedDaily,
+      net_profit:        +((parseFloat(r.gross_profit) || 0) - fixedDaily).toFixed(2)
+    }));
+
+    res.json({ rows: result, fixed_daily: fixedDaily });
+  } catch(e) {
+    console.error('Daily analytics error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Recurring Expenditures CRUD ─────────────────────────────────────────
+// Each row = one fixed cost line (e.g. Rent €33.33/day) applied every day
+
+// GET all recurring expenditures for this business
+router.get('/expenditures/recurring', requireAdmin, async (req, res) => {
+  try {
+    const rows = await query(
+      `SELECT r.*, u.name AS created_by_name
+       FROM recurring_expenditures r
+       LEFT JOIN users u ON u.id = r.created_by
+       WHERE r.business_id = ?
+       ORDER BY r.is_active DESC, r.category, r.description`,
+      [bid(req)]
+    );
+    const total = rows.filter(r => r.is_active).reduce((s, r) => s + parseFloat(r.daily_amount || 0), 0);
+    res.json({ rows, total_daily: +total.toFixed(2) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
- 
+
+// POST create recurring expenditure
+router.post('/expenditures/recurring', requireAdmin, async (req, res) => {
+  try {
+    const { category = 'General', description, daily_amount } = req.body;
+    if (!description || !daily_amount)
+      return res.status(400).json({ error: 'Description and daily amount are required' });
+    const r = await run(
+      `INSERT INTO recurring_expenditures (business_id, category, description, daily_amount, created_by)
+       VALUES (?, ?, ?, ?, ?)`,
+      [bid(req), category, description, parseFloat(daily_amount), req.session.user.id]
+    );
+    res.status(201).json({ success: true, id: r.insertId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT update recurring expenditure
+router.put('/expenditures/recurring/:id', requireAdmin, async (req, res) => {
+  try {
+    const { category, description, daily_amount, is_active } = req.body;
+    await run(
+      `UPDATE recurring_expenditures
+       SET category=?, description=?, daily_amount=?, is_active=?, updated_at=NOW()
+       WHERE id=? AND business_id=?`,
+      [category || 'General', description, parseFloat(daily_amount), is_active ? 1 : 0, req.params.id, bid(req)]
+    );
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE recurring expenditure
+router.delete('/expenditures/recurring/:id', requireAdmin, async (req, res) => {
+  try {
+    await run('DELETE FROM recurring_expenditures WHERE id=? AND business_id=?', [req.params.id, bid(req)]);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
 // 2. Most Moving — item name, qty sold, profit, created_at
 router.get('/analytics/most-moving', requireAdmin, async (req, res) => {
   try {
@@ -131,7 +223,7 @@ router.get('/analytics/most-moving', requireAdmin, async (req, res) => {
     res.json({ rows });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // 3. Dead Stock — items never sold or not sold in selected period
 router.get('/analytics/dead-stock', requireAdmin, async (req, res) => {
   try {
@@ -159,7 +251,7 @@ router.get('/analytics/dead-stock', requireAdmin, async (req, res) => {
     res.json({ rows });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // 4. Returned Items — orders with status=refunded + sold_items with state=1
 router.get('/analytics/returned', requireAdmin, async (req, res) => {
   try {
@@ -197,7 +289,7 @@ router.get('/analytics/returned', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Items ──────────────────────────────────────────────────────────────
+
 router.get('/items',          ItemCtrl.getItems);
 router.get('/items/sku/:sku', ItemCtrl.getBySku);
 router.get('/items/:id',      ItemCtrl.getItem);
@@ -213,32 +305,6 @@ router.get('/orders/validate-discount', OrderCtrl.validateDiscount);
 router.get('/orders/number/:num',       OrderCtrl.getOrderByNumber);
 router.get('/orders/:id',               OrderCtrl.getOrder);
 router.put('/orders/:id/status',        OrderCtrl.updateStatus);
-
-
-// ── Customers ──────────────────────────────────────────────────────────
-router.post('/users', requireSuperAdmin, async (req, res) => {
-  try {
-    const bcrypt = require('bcryptjs');
-
-    const { business_id, name, email, password, role } = req.body;
-
-    const hashed = await bcrypt.hash(password, 12);
-
-    const r = await run(
-      `INSERT INTO users (business_id, name, email, password, role)
-       VALUES (?, ?, ?, ?, ?)`,
-      [business_id, name, email, hashed, role]
-    );
-
-    res.status(201).json({
-      success: true,
-      id: r.insertId
-    });
-
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
-});
 
 // ── Customers ──────────────────────────────────────────────────────────
 router.get('/customers', async (req, res) => {

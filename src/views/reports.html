@@ -77,8 +77,31 @@ tr:hover td{background:var(--s2)}
 .days-sel{background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-family:var(--font);font-size:12px;padding:7px 10px;outline:none;cursor:pointer}
 .days-sel:focus{border-color:var(--a)}
 
-/* ── Responsive ── */
-@media(max-width:600px){
+/* ── Expenditure drawer ── */
+.exp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:800;opacity:0;pointer-events:none;transition:opacity .25s}
+.exp-overlay.open{opacity:1;pointer-events:all}
+.exp-drawer{position:absolute;top:0;right:0;bottom:0;width:100%;max-width:400px;background:var(--s1);border-left:1px solid var(--border2);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,1,.35,1);overflow-y:auto}
+.exp-overlay.open .exp-drawer{transform:translateX(0)}
+.exp-drawer-head{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--s1);z-index:1}
+.exp-add-form{padding:16px 18px;border-bottom:1px solid var(--border);background:var(--s2)}
+.exp-item{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--border);font-size:13px}
+.exp-item:last-child{border:none}
+.exp-item-left{flex:1;min-width:0}
+.exp-item-cat{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.exp-item-desc{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-item-amt{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--red);flex-shrink:0}
+.exp-del{width:26px;height:26px;border-radius:6px;border:none;background:none;color:var(--t3);cursor:pointer;display:grid;place-items:center;font-size:14px;transition:all .12s;flex-shrink:0}
+.exp-del:hover{background:rgba(255,77,106,.15);color:var(--red)}
+/* Net profit colour */
+.net-pos{color:var(--green);font-weight:800}
+.net-neg{color:var(--red);font-weight:800}
+.net-zero{color:var(--t2);font-weight:700}
+/* Add expenditure btn in table */
+.exp-add-btn{padding:4px 10px;font-size:11px;border-radius:var(--rs);border:1px dashed var(--border2);background:none;color:var(--t2);cursor:pointer;font-family:var(--font);transition:all .13s;white-space:nowrap}
+.exp-add-btn:hover{border-color:var(--a);color:var(--a);background:rgba(61,139,255,.07)}
+.has-exp{border-color:rgba(255,77,106,.4);color:var(--red);background:rgba(255,77,106,.07)}
+.has-exp:hover{background:rgba(255,77,106,.15)}
+@media(max-width:600px){.exp-drawer{max-width:100%}}
   .tbl-wrap{display:none}
   .mob-cards{display:block}
   .sg{grid-template-columns:repeat(2,1fr);gap:8px}
@@ -164,14 +187,89 @@ tr:hover td{background:var(--s2)}
       <button class="back-btn" onclick="closeAnalytics()">← Back</button>
       <div class="panel-title">📅 Daily Report</div>
       <span id="dailyRange" style="font-size:12px;color:var(--t2)"></span>
+      <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px;margin-left:auto" onclick="openExpManager()">
+        ⚙️ Manage Fixed Costs
+      </button>
     </div>
+
+    <!-- Fixed daily deduction banner -->
+    <div id="fixedCostBanner" style="display:none;background:rgba(255,77,106,.07);border:1px solid rgba(255,77,106,.2);border-radius:var(--r);padding:11px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:16px">💸</span>
+      <span style="font-size:13px;color:var(--t2)">Fixed daily costs deducted from every day's profit:</span>
+      <strong id="fixedCostTotal" style="font-family:var(--mono);font-size:16px;color:var(--red)"></strong>
+      <span style="font-size:12px;color:var(--t3)">/day</span>
+    </div>
+
+    <!-- Desktop table -->
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Sale Date</th><th>Day</th><th>Total Sale</th><th>Total Profit</th><th>Qty</th><th>First Sale</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Sale Date</th>
+            <th>Day</th>
+            <th>Total Sale</th>
+            <th>Gross Profit</th>
+            <th>Fixed Costs/day</th>
+            <th style="color:var(--a)">Net Profit</th>
+            <th>Qty</th>
+          </tr>
+        </thead>
         <tbody id="dailyTbl"></tbody>
       </table>
     </div>
     <div class="mob-cards" id="dailyCards"></div>
+
+    <!-- ── Fixed Cost Manager (slide-in panel) ── -->
+    <div class="exp-overlay" id="expOverlay" onclick="if(event.target===this)closeExpManager()">
+      <div class="exp-drawer" id="expDrawer">
+        <div class="exp-drawer-head">
+          <div>
+            <div style="font-size:15px;font-weight:800">⚙️ Fixed Daily Costs</div>
+            <div style="font-size:12px;color:var(--t2)">Applied automatically every day</div>
+          </div>
+          <button class="od-close" onclick="closeExpManager()">✕</button>
+        </div>
+
+        <!-- How it works info -->
+        <div style="padding:12px 18px;background:rgba(61,139,255,.06);border-bottom:1px solid var(--border);font-size:12px;color:var(--t2);line-height:1.6">
+          Set your fixed costs once — rent, salaries, utilities — and they are automatically subtracted from every day's gross profit to show the real <strong style="color:var(--text)">Net Profit</strong>.
+        </div>
+
+        <!-- Total -->
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:var(--t2);font-weight:600">Total deducted per day</span>
+          <span id="expManagerTotal" style="font-family:var(--mono);font-size:20px;font-weight:800;color:var(--red)">—</span>
+        </div>
+
+        <!-- Add new cost form -->
+        <div class="exp-add-form">
+          <div style="font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Add Fixed Cost</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div>
+              <label style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Category</label>
+              <select class="input" id="expCat" style="font-size:12px;padding:7px 10px">
+                <option>Rent</option><option>Salaries</option><option>Utilities</option>
+                <option>Supplies</option><option>Transport</option><option>Marketing</option>
+                <option>Maintenance</option><option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Daily Amount *</label>
+              <input class="input" id="expAmount" type="number" step="0.01" placeholder="0.00" style="font-size:13px;padding:7px 10px">
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Description *</label>
+            <input class="input" id="expDesc" placeholder="e.g. Shop rent (÷30 days)" style="font-size:13px" onkeydown="if(event.key==='Enter')saveExpenditure()">
+          </div>
+          <button class="btn btn-primary" style="width:100%" onclick="saveExpenditure()">+ Add Fixed Cost</button>
+        </div>
+
+        <!-- Existing costs list -->
+        <div style="padding:12px 18px 6px;font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px">Your Fixed Costs</div>
+        <div id="expList" style="flex:1;overflow-y:auto"></div>
+      </div>
+    </div>
   </div>
 
   <!-- 2. Most Moving -->
@@ -376,32 +474,147 @@ function dateStr(s){ return s?new Date(s).toLocaleDateString('en-GB',{day:'2-dig
 async function loadDaily(){
   document.getElementById('panelDaily').classList.add('active');
   document.getElementById('dailyRange').textContent=rangeLabel();
-  document.getElementById('dailyTbl').innerHTML='<tr><td colspan="6"><div class="spinner"></div></td></tr>';
+  document.getElementById('dailyTbl').innerHTML='<tr><td colspan="7"><div class="spinner"></div></td></tr>';
   document.getElementById('dailyCards').innerHTML='';
   try{
-    const{rows}=await API.get(`/api/analytics/daily?date_from=${getDF()}&date_to=${getDT()}`);
+    const{rows, fixed_daily}=await API.get(`/api/analytics/daily?date_from=${getDF()}&date_to=${getDT()}`);
+
+    // Show fixed cost banner
+    const banner=document.getElementById('fixedCostBanner');
+    const totalEl=document.getElementById('fixedCostTotal');
+    if(fixed_daily>0){
+      totalEl.textContent=fmt(fixed_daily);
+      banner.style.display='flex';
+    } else {
+      banner.style.display='none';
+    }
+
     if(!rows.length){
-      document.getElementById('dailyTbl').innerHTML='<tr><td colspan="6"><div class="empty-state" style="padding:20px"><p>No sales in this period</p></div></td></tr>';
-      document.getElementById('dailyCards').innerHTML='<div class="empty-state" style="padding:20px"><p>No sales in this period</p></div>';
+      const empty='<div class="empty-state" style="padding:20px"><p>No sales in this period</p></div>';
+      document.getElementById('dailyTbl').innerHTML=`<tr><td colspan="7">${empty}</td></tr>`;
+      document.getElementById('dailyCards').innerHTML=empty;
       return;
     }
-    document.getElementById('dailyTbl').innerHTML=rows.map(r=>`<tr>
-      <td><strong>${r.sale_date.split('T')[0]}</strong></td>
-      <td style="color:var(--t2)">${r.sale_day}</td>
-      <td class="mono" style="color:var(--green)">${fmt(r.total_sale)}</td>
-      <td class="mono" style="color:var(--a)">${fmt(r.total_profit)}</td>
-      <td class="mono">${r.quantity}</td>
-      <td style="color:var(--t3);font-size:11px">${dateStr(r.created_at)}</td>
-    </tr>`).join('');
-    document.getElementById('dailyCards').innerHTML=rows.map(r=>`<div class="m-card">
-      <div class="m-card-top">
-        <div class="m-card-name">${r.sale_date} <span style="color:var(--t3);font-weight:400;font-size:11px">${r.sale_day}</span></div>
-        <div class="m-card-val">${fmt(r.total_sale)}</div>
-      </div>
-      <div class="m-card-meta">
-        <span class="m-tag blue">Profit: ${fmt(r.total_profit)}</span>
-        <span class="m-tag">${r.quantity} items sold</span>
-      </div></div>`).join('');
+
+    document.getElementById('dailyTbl').innerHTML=rows.map(r=>{
+      const net=parseFloat(r.net_profit||0);
+      const exp=parseFloat(r.total_expenditure||0);
+      const netCls=net>0?'net-pos':net<0?'net-neg':'net-zero';
+      return `<tr>
+        <td><strong>${r.sale_date}</strong></td>
+        <td style="color:var(--t2)">${r.sale_day}</td>
+        <td class="mono" style="color:var(--green)">${fmt(r.total_sale)}</td>
+        <td class="mono" style="color:var(--a)">${fmt(r.gross_profit)}</td>
+        <td class="mono" style="color:var(--red)">${exp>0?'-'+fmt(exp):'—'}</td>
+        <td class="mono ${netCls}">${fmt(net)}</td>
+        <td class="mono">${r.quantity}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('dailyCards').innerHTML=rows.map(r=>{
+      const net=parseFloat(r.net_profit||0);
+      const exp=parseFloat(r.total_expenditure||0);
+      const netCls=net>0?'blue':net<0?'red':'';
+      return `<div class="m-card">
+        <div class="m-card-top">
+          <div class="m-card-name">${r.sale_date} <span style="color:var(--t3);font-weight:400;font-size:11px">${r.sale_day}</span></div>
+          <div class="m-card-val">${fmt(r.total_sale)}</div>
+        </div>
+        <div class="m-card-meta">
+          <span class="m-tag blue">Gross: ${fmt(r.gross_profit)}</span>
+          ${exp>0?`<span class="m-tag red">Costs: -${fmt(exp)}</span>`:''}
+          <span class="m-tag ${netCls}">Net: ${fmt(net)}</span>
+          <span class="m-tag">${r.quantity} sold</span>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+/* ── Fixed Cost Manager ── */
+async function openExpManager(){
+  document.getElementById('expOverlay').classList.add('open');
+  document.getElementById('expAmount').value='';
+  document.getElementById('expDesc').value='';
+  document.getElementById('expCat').value='Rent';
+  await refreshExpList();
+  setTimeout(()=>document.getElementById('expDesc').focus(),300);
+}
+
+function closeExpManager(){
+  document.getElementById('expOverlay').classList.remove('open');
+  loadDaily(); // Refresh report to show updated costs
+}
+
+async function refreshExpList(){
+  try{
+    const{rows,total_daily}=await API.get('/api/expenditures/recurring');
+    document.getElementById('expManagerTotal').textContent=fmt(total_daily)+'/day';
+
+    // Update banner on daily report
+    const banner=document.getElementById('fixedCostBanner');
+    const totalEl=document.getElementById('fixedCostTotal');
+    if(total_daily>0){ totalEl.textContent=fmt(total_daily); banner.style.display='flex'; }
+    else { banner.style.display='none'; }
+
+    if(!rows.length){
+      document.getElementById('expList').innerHTML=
+        '<div style="padding:24px;text-align:center;color:var(--t3);font-size:13px">No fixed costs yet.<br>Add your first one above.</div>';
+      return;
+    }
+    document.getElementById('expList').innerHTML=rows.map(e=>`
+      <div class="exp-item" style="${!e.is_active?'opacity:.45':''}">
+        <div class="exp-item-left">
+          <div class="exp-item-cat">${e.category}</div>
+          <div class="exp-item-desc">${e.description}</div>
+          <div style="font-size:10px;color:var(--t3);margin-top:2px">${e.is_active?'Active':'Paused'}</div>
+        </div>
+        <span class="exp-item-amt" style="${!e.is_active?'color:var(--t3)':''}">
+          ${e.is_active?'-':''}${fmt(e.daily_amount)}/day
+        </span>
+        <button class="exp-del" style="color:var(--a);font-size:11px;width:auto;padding:0 6px"
+          onclick="toggleExp(${e.id},${e.is_active?0:1})" title="${e.is_active?'Pause':'Activate'}">
+          ${e.is_active?'⏸':'▶'}
+        </button>
+        <button class="exp-del" onclick="deleteExp(${e.id})" title="Delete">✕</button>
+      </div>`).join('');
+  }catch(ex){ showToast(ex.message,'error'); }
+}
+
+async function saveExpenditure(){
+  const amount=parseFloat(document.getElementById('expAmount').value);
+  const desc=document.getElementById('expDesc').value.trim();
+  const cat=document.getElementById('expCat').value;
+  if(!amount||amount<=0){showToast('Enter a valid daily amount','error');return;}
+  if(!desc){showToast('Description is required','error');return;}
+  try{
+    await API.post('/api/expenditures/recurring',{category:cat,description:desc,daily_amount:amount});
+    document.getElementById('expAmount').value='';
+    document.getElementById('expDesc').value='';
+    showToast('✅ Fixed cost added','success');
+    await refreshExpList();
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+async function toggleExp(id, newState){
+  try{
+    const rows=(await API.get('/api/expenditures/recurring')).rows;
+    const row=rows.find(r=>r.id===id);
+    if(!row) return;
+    await API.put(`/api/expenditures/recurring/${id}`,{
+      category:row.category, description:row.description,
+      daily_amount:row.daily_amount, is_active:newState
+    });
+    await refreshExpList();
+  }catch(e){ showToast(e.message,'error'); }
+}
+
+async function deleteExp(id){
+  if(!confirm('Remove this fixed cost?')) return;
+  try{
+    await API.delete(`/api/expenditures/recurring/${id}`);
+    showToast('Removed','success');
+    await refreshExpList();
   }catch(e){ showToast(e.message,'error'); }
 }
 
