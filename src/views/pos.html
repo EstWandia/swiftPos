@@ -123,14 +123,14 @@
   </div>
 
   <!-- Customer -->
-  <div class="od-customer" onclick="openCustomerSearch()">
+  <!-- <div class="od-customer" onclick="openCustomerSearch()">
     <div class="cust-av">👤</div>
     <div class="cust-info">
       <div class="cust-name" id="custName">Walk-in Customer</div>
       <div class="cust-sub"  id="custSub">Tap to assign</div>
     </div>
     <span style="color:var(--t3);font-size:18px">›</span>
-  </div>
+  </div> -->
 
   <!-- Empty state — OUTSIDE odItems so innerHTML never destroys it -->
   <div class="cart-empty" id="cartEmpty">
@@ -147,8 +147,8 @@
     <!-- Totals strip -->
     <div class="tot-strip">
       <div class="tot-cell"><div class="tc-lbl">Subtotal</div><div class="tc-val mono" id="tSub">€0.00</div></div>
-      <div class="tot-cell"><div class="tc-lbl">Tax</div><div class="tc-val mono" id="tTax">€0.00</div></div>
-      <div class="tot-cell"><div class="tc-lbl">Discount</div><div class="tc-val mono" id="tDisc">€0.00</div></div>
+      <!-- <div class="tot-cell"><div class="tc-lbl">Tax</div><div class="tc-val mono" id="tTax">€0.00</div></div> -->
+      <!-- <div class="tot-cell"><div class="tc-lbl">Discount</div><div class="tc-val mono" id="tDisc">€0.00</div></div> -->
     </div>
     <!-- Grand total -->
     <div class="grand-row">
@@ -156,19 +156,19 @@
       <span class="gr-val mono" id="tTotal">€0.00</span>
     </div>
     <!-- Discount input -->
-    <div class="disc-row">
+    <!-- <div class="disc-row">
       <input class="input" id="discIn" placeholder="Code or % or fixed amount (e.g. 10% or 5)" style="flex:1">
       <button class="btn btn-ghost" onclick="applyDiscount()">Apply</button>
-    </div>
+    </div> -->
     <!-- Payment methods -->
     <div class="pay-row">
       <button class="pay-opt on" data-method="cash" onclick="setPay(this)"><span class="pi">💵</span>Cash</button>
-      <button class="pay-opt"    data-method="card" onclick="setPay(this)"><span class="pi">💳</span>Card</button>
-      <button class="pay-opt"    data-method="qr"   onclick="setPay(this)"><span class="pi">📱</span>QR Pay</button>
+      <button class="pay-opt"    data-method="Mpesa" onclick="setPay(this)"><span class="pi">💳</span>Card</button>
+      <!-- <button class="pay-opt"    data-method="qr"   onclick="setPay(this)"><span class="pi">📱</span>QR Pay</button> -->
     </div>
     <!-- Cash tendered -->
     <div class="cash-row show" id="cashRow">
-      <input class="input" id="tenderedIn" type="number" placeholder="Amount tendered" step="0.01" min="0" oninput="calcChange()">
+      <input class="input" id="tenderedIn" type="number" placeholder="Amount Given" step="0.01" min="0" oninput="calcChange()">
       <div class="change-display" id="changeDisplay"></div>
     </div>
     <!-- Charge button -->
@@ -196,7 +196,7 @@
 </div>
 
 <!-- CUSTOMER SEARCH MODAL -->
-<div class="cust-modal" id="custModal">
+<!-- <div class="cust-modal" id="custModal">
   <div class="cm-box">
     <div class="flex items-center justify-between" style="margin-bottom:14px">
       <h3 style="font-size:15px">Assign Customer</h3>
@@ -206,7 +206,7 @@
     <div id="custResults"></div>
     <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="openNewCustomer()">+ New Customer</button>
   </div>
-</div>
+</div> -->
 
 <!-- ══════════════════════════════════
      BARCODE SCANNER OVERLAY
