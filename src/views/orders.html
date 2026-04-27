@@ -107,7 +107,7 @@ tr.clickable{cursor:pointer}
 <script>
 let page=0,totalOrders=0,currentUser=null;
 const LIMIT=30;
-const payIco={cash:'💵',card:'💳',qr:'📱',mixed:'💰'};
+const payIco={cash:'💵',Mpesa:'💳'};
 
 (async function(){
   try{const{user}=await API.get('/api/me');currentUser=user;
@@ -129,7 +129,8 @@ async function loadSummary(d){
     document.getElementById('sumCount').textContent=summary.order_count||0;
     document.getElementById('sumRev').textContent=fmt(summary.revenue||0);
     document.getElementById('sumAvg').textContent=fmt(summary.avg_order_value||0);
-    document.getElementById('sumTax').textContent=fmt(summary.tax_collected||0);
+    document.getElementById('sumTax').textContent=fmt(0);
+    // document.getElementById('sumTax').textContent=fmt(summary.tax_collected||0);
   }catch(_){}
 }
 
@@ -154,7 +155,7 @@ function renderTable(orders){
         <td style="color:var(--t3)">${page*LIMIT+i+1}</td>
         <td><strong class="mono">${o.order_number}</strong></td>
         <td style="color:var(--t2);white-space:nowrap;font-size:12px">${fmtDateTime(o.created_at)}</td>
-        <td>${o.customer_name||'<span style="color:var(--t3)">Walk-in</span>'}</td>
+        <!-- <td>${o.customer_name||'<span style="color:var(--t3)">Walk-in</span>'}</td> -->
         <td><span class="badge badge-blue">${o.item_count} items</span></td>
         <td>${payIco[o.payment_method]||'💰'} <span style="font-size:11px;color:var(--t2)">${o.payment_method}</span></td>
         <td><strong class="mono">${fmt(o.total)}</strong></td>
@@ -210,10 +211,10 @@ async function openDetail(id){
       <div class="ds"><h4>Totals</h4>
         <div class="tl-box">
           <div class="tl-row"><span class="l">Subtotal</span><span class="v mono">${fmt(order.subtotal)}</span></div>
-          <div class="tl-row"><span class="l">Tax</span><span class="v mono">${fmt(order.tax_total)}</span></div>
-          ${parseFloat(order.discount_amount)>0?`<div class="tl-row"><span class="l" style="color:var(--green)">Discount ${order.discount_code?'('+order.discount_code+')':''}</span><span class="v mono" style="color:var(--green)">-${fmt(order.discount_amount)}</span></div>`:''}
+          <!-- <div class="tl-row"><span class="l">Tax</span><span class="v mono">${fmt(order.tax_total)}</span></div> -->
+          <!-- ${parseFloat(order.discount_amount)>0?`<div class="tl-row"><span class="l" style="color:var(--green)">Discount ${order.discount_code?'('+order.discount_code+')':''}</span><span class="v mono" style="color:var(--green)">-${fmt(order.discount_amount)}</span></div>`:''}-->
           <div class="tl-row gt"><span class="l">Total</span><span class="v">${fmt(order.total)}</span></div>
-          ${order.amount_tendered?`<div class="tl-row"><span class="l">Tendered</span><span class="v mono">${fmt(order.amount_tendered)}</span></div>`:''}
+          ${order.amount_tendered?`<div class="tl-row"><span class="l">Given</span><span class="v mono">${fmt(order.amount_tendered)}</span></div>`:''}
           ${order.change_amount!=null&&parseFloat(order.change_amount)>=0?`<div class="tl-row"><span class="l">Change</span><span class="v mono" style="color:var(--green)">${fmt(order.change_amount)}</span></div>`:''}
         </div>
       </div>
