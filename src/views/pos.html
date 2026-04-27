@@ -123,14 +123,14 @@
   </div>
 
   <!-- Customer -->
-  <div class="od-customer" onclick="openCustomerSearch()">
+  <!-- <div class="od-customer" onclick="openCustomerSearch()">
     <div class="cust-av">👤</div>
     <div class="cust-info">
       <div class="cust-name" id="custName">Walk-in Customer</div>
       <div class="cust-sub"  id="custSub">Tap to assign</div>
     </div>
     <span style="color:var(--t3);font-size:18px">›</span>
-  </div>
+  </div> -->
 
   <!-- Empty state — OUTSIDE odItems so innerHTML never destroys it -->
   <div class="cart-empty" id="cartEmpty">
@@ -163,7 +163,7 @@
     <!-- Payment methods -->
     <div class="pay-row">
       <button class="pay-opt on" data-method="cash" onclick="setPay(this)"><span class="pi">💵</span>Cash</button>
-      <button class="pay-opt"    data-method="Mpesa" onclick="setPay(this)"><span class="pi">💳</span>Card</button>
+      <button class="pay-opt"    data-method="card" onclick="setPay(this)"><span class="pi">💳</span>Mpesa</button>
       <!-- <button class="pay-opt"    data-method="qr"   onclick="setPay(this)"><span class="pi">📱</span>QR Pay</button> -->
     </div>
     <!-- Cash tendered -->

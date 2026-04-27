@@ -245,8 +245,8 @@ body { display: flex; flex-direction: column; }
 .gr-lbl { font-size:14px;font-weight:700;color:var(--t2); }
 .gr-val { font-size:22px;font-weight:800;color:var(--a); }
 .disc-row { display:flex;gap:8px;margin-bottom:10px; }
-.pay-row { display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px; }
-.pay-opt { padding:10px 4px;border-radius:10px;border:1px solid var(--border);background:var(--s2);color:var(--t2);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;text-align:center;transition:all .13s; }
+.pay-row { display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:8px; }
+.pay-opt { padding:6px 3px;border-radius:8px;border:1px solid var(--border);background:var(--s2);color:var(--t2);font-size:10px;font-weight:600;font-family:var(--font);cursor:pointer;text-align:center;transition:all .13s; }
 .pay-opt:hover { border-color:var(--a);color:var(--a); }
 .pay-opt.on { background:rgba(61,139,255,.15);border-color:var(--a);color:var(--a); }
 .pi { font-size:18px;display:block;margin-bottom:3px; }
