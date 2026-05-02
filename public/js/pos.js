@@ -371,30 +371,30 @@ function clearCart() {
 // ── Core totals calculator ────────────────────────────
 function calcTotals() {
   const subtotal = cart.reduce((s,i) => s + i.price * i.qty, 0);
-  const taxTotal = cart.reduce((s,i) => s + i.price * i.qty * ((i.tax_rate || 10) / 100), 0);
-  let discAmt = 0;
-  if (discountType === 'percent') discAmt = (subtotal + taxTotal) * (discountPct / 100);
-  else if (discountType === 'fixed') discAmt = Math.min(discountAmt, subtotal + taxTotal);
-  const grand = subtotal + taxTotal - discAmt;
+  // const taxTotal = cart.reduce((s,i) => s + i.price * i.qty * ((i.tax_rate || 0) / 100), 0);
+  // let discAmt = 0;
+  // if (discountType === 'percent') discAmt = (subtotal + taxTotal) * (discountPct / 100);
+  // else if (discountType === 'fixed') discAmt = Math.min(discountAmt, subtotal + taxTotal);
+  const grand = subtotal;
   return {
     subtotal:  +subtotal.toFixed(2),
-    taxTotal:  +taxTotal.toFixed(2),
-    discAmt:   +discAmt.toFixed(2),
+    // taxTotal:  +taxTotal.toFixed(2),
+    // discAmt:   +discAmt.toFixed(2),
     grand:     +grand.toFixed(2),
     qty:       cart.reduce((s,i) => s + i.qty, 0)
   };
 }
 
 function renderCart() {
-  const { subtotal, taxTotal, discAmt, grand, qty } = calcTotals();
+  const { subtotal, grand, qty } = calcTotals();
 
   // Update footer totals
   const g = id => document.getElementById(id);
   g('odBadge').textContent   = qty + ' item' + (qty !== 1 ? 's' : '');
   g('tSub').textContent      = fmt(subtotal);
-  g('tTax').textContent      = fmt(taxTotal);
-  g('tDisc').textContent     = discAmt > 0 ? '-' + fmt(discAmt) : fmt(0);
-  g('tDisc').style.color     = discAmt > 0 ? 'var(--green)' : '';
+  // g('tTax').textContent      = fmt(taxTotal);
+  // g('tDisc').textContent     = discAmt > 0 ? '-' + fmt(discAmt) : fmt(0);
+  // g('tDisc').style.color     = discAmt > 0 ? 'var(--green)' : '';
   g('tTotal').textContent    = fmt(grand);
   g('chargeAmt').textContent = fmt(grand);
   g('chargeBtn').disabled    = cart.length === 0;
