@@ -125,7 +125,7 @@ tr:hover td{background:var(--s2)}
       <table>
         <thead>
           <tr>
-            <th>Item</th><th>SKU</th><th>Category</th>
+            <th>Item</th><!--<th>SKU</th> --><th>Category</th>
             <th>Price</th><th>Cost</th><th>Stock</th>
             <th>Status</th><th>Actions</th>
           </tr>
@@ -303,7 +303,7 @@ function filterInv(){
   document.getElementById('invBody').innerHTML=f.length
     ?f.map(it=>`<tr>
         <td><span style="font-size:17px">${it.emoji}</span> <strong>${it.name}</strong><div style="font-size:11px;color:var(--t3)">${it.description||''}</div></td>
-        <td class="mono" style="color:var(--t2)">${it.sku}</td>
+       ${false ? `<td class="mono" style="color:var(--t2)">${it.sku}</td>` : ''}
         <td>${it.category_emoji||''} ${it.category_name||''}</td>
         <td class="mono">${fmt(it.price)}</td>
         <td class="mono" style="color:var(--t3)">${it.cost_price?fmt(it.cost_price):'—'}</td>
