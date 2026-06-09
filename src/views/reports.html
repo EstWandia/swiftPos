@@ -731,11 +731,19 @@
               <th>Day</th>
               <th>Total Sale</th>
               <th>Gross Profit</th>
-              <th>Fixed Costs/day</th>
               <th style="color:var(--a)">Net Profit</th>
               <th>Qty</th>
             </tr>
           </thead>
+          <tfoot>
+            <tr style="font-weight:800;background:var(--s2)">
+              <td colspan="2">TOTAL</td>
+              <td class="mono" id="totSales">0</td>
+              <td class="mono" id="totGross">0</td>
+              <td class="mono" id="totNet">0</td>
+              <td class="mono" id="totQty">0</td>
+            </tr>
+          </tfoot>
           <tbody id="dailyTbl"></tbody>
         </table>
       </div>
@@ -1051,7 +1059,7 @@
     async function loadDaily() {
       document.getElementById('panelDaily').classList.add('active');
       document.getElementById('dailyRange').textContent = rangeLabel();
-      document.getElementById('dailyTbl').innerHTML = '<tr><td colspan="7"><div class="spinner"></div></td></tr>';
+      document.getElementById('dailyTbl').innerHTML = '<tr><td colspan="6"><div class="spinner"></div></td></tr>';
       document.getElementById('dailyCards').innerHTML = '';
       try {
         const { rows, fixed_daily } = await API.get(`/api/analytics/daily?date_from=${getDF()}&date_to=${getDT()}`);
@@ -1068,7 +1076,7 @@
 
         if (!rows.length) {
           const empty = '<div class="empty-state" style="padding:20px"><p>No sales in this period</p></div>';
-          document.getElementById('dailyTbl').innerHTML = `<tr><td colspan="7">${empty}</td></tr>`;
+          document.getElementById('dailyTbl').innerHTML = `<tr><td colspan="6">${empty}</td></tr>`;
           document.getElementById('dailyCards').innerHTML = empty;
           return;
         }
@@ -1082,7 +1090,6 @@
         <td style="color:var(--t2)">${r.sale_day}</td>
         <td class="mono" style="color:var(--green)">${fmt(r.total_sale)}</td>
         <td class="mono" style="color:var(--a)">${fmt(r.gross_profit)}</td>
-        <td class="mono" style="color:var(--red)">${exp > 0 ? '-' + fmt(exp) : '—'}</td>
         <td class="mono ${netCls}">${fmt(net)}</td>
         <td class="mono">${r.quantity}</td>
       </tr>`;
@@ -1099,12 +1106,25 @@
         </div>
         <div class="m-card-meta">
           <span class="m-tag blue">Gross: ${fmt(r.gross_profit)}</span>
-          ${exp > 0 ? `<span class="m-tag red">Costs: -${fmt(exp)}</span>` : ''}
           <span class="m-tag ${netCls}">Net: ${fmt(net)}</span>
           <span class="m-tag">${r.quantity} sold</span>
         </div>
       </div>`;
         }).join('');
+
+        const totals = rows.reduce((acc, r) => {
+          acc.sales += parseFloat(r.total_sale || 0);
+          acc.gross += parseFloat(r.gross_profit || 0);
+          acc.net += parseFloat(r.net_profit || 0);
+          acc.qty += parseFloat(r.quantity || 0);
+          return acc;
+        }, { sales: 0, gross: 0, net: 0, qty: 0 });
+
+        document.getElementById('totSales').textContent = fmt(totals.sales);
+        document.getElementById('totGross').textContent = fmt(totals.gross);
+        document.getElementById('totNet').textContent = fmt(totals.net);
+        document.getElementById('totQty').textContent = totals.qty;
+
       } catch (e) { showToast(e.message, 'error'); }
     }
 
