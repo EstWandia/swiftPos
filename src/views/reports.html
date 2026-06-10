@@ -586,7 +586,7 @@
     }
 
     .sc {
-      padding: 11px 12px
+      padding: 4px 5px
     }
 
     .sv {
@@ -951,7 +951,6 @@
         document.getElementById('statsGrid').innerHTML = `
       <div class="sc"><div class="sl">Orders</div><div class="sv b">${summary.order_count || 0}</div></div>
       <div class="sc"><div class="sl">Revenue</div><div class="sv g">${fmt(summary.revenue || 0)}</div></div>
-      <div class="sc"><div class="sl">Tax</div><div class="sv">${fmt(summary.tax_collected || 0)}</div></div>
       <div class="sc"><div class="sl">Discounts</div><div class="sv a">${fmt(summary.discounts_given || 0)}</div></div>
       <div class="sc"><div class="sl">Avg. Order</div><div class="sv">${fmt(summary.avg_order_value || 0)}</div></div>`;
 
