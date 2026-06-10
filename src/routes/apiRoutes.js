@@ -366,7 +366,7 @@ router.get('/businesses', requireSuperAdmin, async (req, res) => {
 
 router.post('/businesses', requireSuperAdmin, async (req, res) => {
   try {
-    const { name, slug, type, currency = 'EUR', currency_sym = '€', tax_rate = 10, address, email, phone } = req.body;
+    const { name, slug, type, currency = 'EUR', currency_sym = '€', tax_rate = 0, address, email, phone } = req.body;
     const r = await run('INSERT INTO businesses (name,slug,type,currency,currency_sym,tax_rate,address,email,phone) VALUES (?,?,?,?,?,?,?,?,?)',
       [name, slug, type, currency, currency_sym, tax_rate, address, email, phone]);
     res.status(201).json({ success: true, id: r.insertId });

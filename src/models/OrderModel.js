@@ -2,36 +2,36 @@ const { query, queryOne, run, transaction } = require('../config/database');
 
 function genOrderNum(businessId) {
   const d = new Date();
-  const dt = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  const dt = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
   const rnd = Math.floor(1000 + Math.random() * 9000);
   return `ORD-${dt}-${rnd}`;
 }
 
 const OrderModel = {
-  async create({ business_id, cashier_id, customer_id=null, items,
-                 payment_method='cash', discount_type=null, discount_value=0,
-                 discount_code=null, amount_tendered=null, notes=null }) {
+  async create({ business_id, cashier_id, customer_id = null, items,
+    payment_method = 'cash', discount_type = null, discount_value = 0,
+    discount_code = null, amount_tendered = null, notes = null }) {
     return transaction(async ({ q, one }) => {
       // ── Calc totals ─────────────────────────────────────────────────────
       let subtotal = 0, tax_total = 0;
       const lineItems = items.map(item => {
-        const tax_rate  = parseFloat(item.tax_rate) || 10;
-        const pre_tax   = parseFloat(item.price) * parseInt(item.quantity);
-        const tax_amt   = +(pre_tax * (tax_rate / 100)).toFixed(2);
-        const line_tot  = +(pre_tax + tax_amt).toFixed(2);
-        subtotal  += pre_tax;
+        const tax_rate = parseFloat(item.tax_rate) || 0;
+        const pre_tax = parseFloat(item.price) * parseInt(item.quantity);
+        const tax_amt = +(pre_tax * (tax_rate / 100)).toFixed(2);
+        const line_tot = +(pre_tax + tax_amt).toFixed(2);
+        subtotal += pre_tax;
         tax_total += tax_amt;
         return { ...item, tax_rate, tax_amount: tax_amt, line_total: line_tot };
       });
-      subtotal  = +subtotal.toFixed(2);
+      subtotal = +subtotal.toFixed(2);
       tax_total = +tax_total.toFixed(2);
 
       let disc_amt = 0;
-      if (discount_type === 'percent') disc_amt = +((subtotal+tax_total)*(discount_value/100)).toFixed(2);
-      else if (discount_type === 'fixed') disc_amt = +Math.min(discount_value, subtotal+tax_total).toFixed(2);
+      if (discount_type === 'percent') disc_amt = +((subtotal + tax_total) * (discount_value / 100)).toFixed(2);
+      else if (discount_type === 'fixed') disc_amt = +Math.min(discount_value, subtotal + tax_total).toFixed(2);
 
-      const total        = +(subtotal + tax_total - disc_amt).toFixed(2);
-      const change_amt   = amount_tendered != null ? +(parseFloat(amount_tendered) - total).toFixed(2) : null;
+      const total = +(subtotal + tax_total - disc_amt).toFixed(2);
+      const change_amt = amount_tendered != null ? +(parseFloat(amount_tendered) - total).toFixed(2) : null;
       const order_number = genOrderNum(business_id);
 
       // ── Insert order ────────────────────────────────────────────────────
@@ -40,9 +40,9 @@ const OrderModel = {
            subtotal,tax_total,discount_type,discount_value,discount_amount,discount_code,
            total,amount_tendered,change_amount,notes)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [business_id,order_number,customer_id,cashier_id,'completed',payment_method,
-         subtotal,tax_total,discount_type||null,discount_value||0,disc_amt,discount_code||null,
-         total,amount_tendered||null,change_amt,notes||null]
+        [business_id, order_number, customer_id, cashier_id, 'completed', payment_method,
+          subtotal, tax_total, discount_type || null, discount_value || 0, disc_amt, discount_code || null,
+          total, amount_tendered || null, change_amt, notes || null]
       );
       const order_id = orderRes.insertId;
 
@@ -54,7 +54,7 @@ const OrderModel = {
         await q(
           `INSERT INTO order_items (business_id,order_id,item_id,name,sku,price,quantity,tax_rate,tax_amount,line_total)
            VALUES (?,?,?,?,?,?,?,?,?,?)`,
-          [business_id,order_id,li.item_id,li.name,li.sku,li.price,li.quantity,li.tax_rate,li.tax_amount,li.line_total]
+          [business_id, order_id, li.item_id, li.name, li.sku, li.price, li.quantity, li.tax_rate, li.tax_amount, li.line_total]
         );
 
         // sold_items log
@@ -62,22 +62,22 @@ const OrderModel = {
         await q(
           `INSERT INTO sold_items (business_id,item_id,order_id,order_number,cashier_id,cashier_name,item_name,item_sku,category_name,quantity,unit_price,line_total)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-          [business_id,li.item_id,order_id,order_number,cashier_id,cashier?.name||'Unknown',li.name,li.sku,fullItem?.cat_name||'',li.quantity,li.price,li.line_total]
+          [business_id, li.item_id, order_id, order_number, cashier_id, cashier?.name || 'Unknown', li.name, li.sku, fullItem?.cat_name || '', li.quantity, li.price, li.line_total]
         );
 
         // stock
         if (fullItem?.track_stock) {
           await q('UPDATE items SET stock_qty=stock_qty-?, popularity=popularity+? WHERE id=? AND business_id=?',
-                  [li.quantity, li.quantity, li.item_id, business_id]);
+            [li.quantity, li.quantity, li.item_id, business_id]);
           await q('INSERT INTO stock_movements (business_id,item_id,type,quantity,reference,user_id) VALUES (?,?,?,?,?,?)',
-                  [business_id,li.item_id,'sale',-li.quantity,order_number,cashier_id]);
+            [business_id, li.item_id, 'sale', -li.quantity, order_number, cashier_id]);
         }
       }
 
       // customer loyalty
       if (customer_id) {
         await q('UPDATE customers SET total_spent=total_spent+?,visit_count=visit_count+1,loyalty_pts=loyalty_pts+?,updated_at=NOW() WHERE id=? AND business_id=?',
-                [total, Math.floor(total), customer_id, business_id]);
+          [total, Math.floor(total), customer_id, business_id]);
       }
 
       return { order_id, order_number, total, subtotal, tax_total, discount_amount: disc_amt, change_amount: change_amt };
@@ -106,13 +106,13 @@ const OrderModel = {
     return order;
   },
 
-  async getAll(business_id, { status, cashier_id, date_from, date_to, limit=50, offset=0 } = {}) {
+  async getAll(business_id, { status, cashier_id, date_from, date_to, limit = 50, offset = 0 } = {}) {
     let where = 'WHERE o.business_id=?';
     const params = [business_id];
-    if (status)     { where += ' AND o.status=?';              params.push(status); }
-    if (cashier_id) { where += ' AND o.cashier_id=?';          params.push(cashier_id); }
-    if (date_from)  { where += ' AND DATE(o.created_at)>=?';   params.push(date_from); }
-    if (date_to)    { where += ' AND DATE(o.created_at)<=?';   params.push(date_to); }
+    if (status) { where += ' AND o.status=?'; params.push(status); }
+    if (cashier_id) { where += ' AND o.cashier_id=?'; params.push(cashier_id); }
+    if (date_from) { where += ' AND DATE(o.created_at)>=?'; params.push(date_from); }
+    if (date_to) { where += ' AND DATE(o.created_at)<=?'; params.push(date_to); }
 
     const rows = await query(
       `SELECT o.id, o.business_id, o.order_number, o.customer_id, o.cashier_id,
@@ -149,7 +149,7 @@ const OrderModel = {
   async getDailySummary(business_id, { date_from, date_to } = {}) {
     const today = new Date().toISOString().split('T')[0];
     const df = date_from || today;
-    const dt = date_to   || today;
+    const dt = date_to || today;
     return queryOne(
       `SELECT COUNT(*) AS order_count, COALESCE(SUM(total),0) AS revenue,
               COALESCE(SUM(tax_total),0) AS tax_collected,
@@ -159,11 +159,11 @@ const OrderModel = {
       [business_id, df, dt]);
   },
 
-  async getTopItems(business_id, { limit=10, date_from, date_to } = {}) {
+  async getTopItems(business_id, { limit = 10, date_from, date_to } = {}) {
     let where = "WHERE o.status='completed' AND o.business_id=?";
     const params = [business_id];
     if (date_from) { where += ' AND DATE(o.created_at)>=?'; params.push(date_from); }
-    if (date_to)   { where += ' AND DATE(o.created_at)<=?'; params.push(date_to); }
+    if (date_to) { where += ' AND DATE(o.created_at)<=?'; params.push(date_to); }
     return query(
       `SELECT oi.item_id, oi.name, oi.sku, i.emoji,
               SUM(oi.quantity) AS total_qty,

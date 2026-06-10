@@ -153,7 +153,7 @@ function renderProducts(items) {
     // Include stock info in payload so addToCart can check it
     const pStr = JSON.stringify({
       id: p.id, name: p.name, sku: p.sku, emoji: p.emoji,
-      price: effPrice, tax_rate: p.tax_rate || 10,
+      price: effPrice, tax_rate: p.tax_rate || 0,
       track_stock: p.track_stock, stock_qty: p.stock_qty
     }).replace(/"/g,'&quot;');
 
@@ -227,7 +227,7 @@ async function buildSDD(q) {
     } else {
       dd.innerHTML = '<div class="sdd-sec">Quick Add</div>' + top.map((p,i) => {
         const ep = p.on_sale && p.sale_price ? parseFloat(p.sale_price) : parseFloat(p.price);
-        const pStr = JSON.stringify({ id:p.id, name:p.name, sku:p.sku, emoji:p.emoji, price:ep, tax_rate:p.tax_rate||10 }).replace(/"/g,'&quot;');
+        const pStr = JSON.stringify({ id:p.id, name:p.name, sku:p.sku, emoji:p.emoji, price:ep, tax_rate:p.tax_rate||0 }).replace(/"/g,'&quot;');
         return `<div class="sdd-item" id="sdi-${i}" onclick="addToCart('${pStr}');closeSDD();closeMobSearch()">
           <span class="sdd-e">${p.emoji}</span>
           <div class="sdd-inf"><div class="sdd-n">${p.name}</div><div class="sdd-m">${p.category_name||''}</div></div>
@@ -333,10 +333,10 @@ function addToCart(product) {
   if (ex) { ex.qty++; }
   else cart.push({ id: product.id, name: product.name, sku: product.sku,
                    emoji: product.emoji, price: parseFloat(product.price),
-                   tax_rate: parseFloat(product.tax_rate) || 10, qty: 1 });
+                   tax_rate: parseFloat(product.tax_rate) || 0, qty: 1 });
 
   // Update recents (business-scoped)
-  const slim = { id:product.id, name:product.name, emoji:product.emoji, price:parseFloat(product.price), sku:product.sku, tax_rate:parseFloat(product.tax_rate)||10 };
+  const slim = { id:product.id, name:product.name, emoji:product.emoji, price:parseFloat(product.price), sku:product.sku, tax_rate:parseFloat(product.tax_rate)||0 };
   recents = [slim, ...recents.filter(r => r.id !== product.id)].slice(0,8);
   saveRecents(); renderRecents();
 
@@ -535,7 +535,7 @@ async function checkout() {
       sku:      i.sku,
       price:    i.price,
       quantity: i.qty,
-      tax_rate: i.tax_rate || 10,
+      tax_rate: i.tax_rate || 0,
     })),
     payment_method:  payMethod,
     customer_id:     selectedCustomer?.id || null,

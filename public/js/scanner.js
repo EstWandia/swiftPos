@@ -12,14 +12,14 @@
 ══════════════════════════════════════════════════════════════ */
 
 // ── State ─────────────────────────────────────────────────────
-let scannerStream     = null;   // active MediaStream
-let scannerActive     = false;  // overlay is open
-let scannerTimer      = null;   // polling interval
-let useFrontCam       = false;  // camera facing mode
-let zxingReader       = null;   // ZXing reader instance
-let useZxing          = false;  // which engine to use
-let lastScannedCode   = '';     // debounce duplicate scans
-let scanCooldown      = false;  // 2s cooldown after success
+let scannerStream = null;   // active MediaStream
+let scannerActive = false;  // overlay is open
+let scannerTimer = null;   // polling interval
+let useFrontCam = false;  // camera facing mode
+let zxingReader = null;   // ZXing reader instance
+let useZxing = false;  // which engine to use
+let lastScannedCode = '';     // debounce duplicate scans
+let scanCooldown = false;  // 2s cooldown after success
 
 // ── Hardware scanner detection ────────────────────────────────
 // Most USB/Bluetooth barcode scanners type characters very fast
@@ -27,7 +27,7 @@ let scanCooldown      = false;  // 2s cooldown after success
 let hwBuffer = '';
 let hwLastKey = 0;
 const HW_THRESHOLD_MS = 60;   // faster than human typing
-const HW_MIN_LENGTH   = 4;    // min barcode length
+const HW_MIN_LENGTH = 4;    // min barcode length
 
 document.getElementById('hwScanInput').addEventListener('keydown', hwKeyHandler);
 
@@ -96,7 +96,7 @@ async function startCamera() {
   const constraints = {
     video: {
       facingMode: { ideal: facing },
-      width:  { ideal: 1280 },
+      width: { ideal: 1280 },
       height: { ideal: 720 },
     }
   };
@@ -147,7 +147,7 @@ function stopCamera() {
     scannerStream = null;
   }
   if (zxingReader) {
-    try { zxingReader.reset(); } catch (_) {}
+    try { zxingReader.reset(); } catch (_) { }
     zxingReader = null;
   }
 }
@@ -160,8 +160,8 @@ function flipCamera() {
 // ── Engine 1: BarcodeDetector (Chrome / Android) ──────────────
 function startBarcodeDetector(video) {
   const formats = [
-    'code_128','code_39','code_93','ean_13','ean_8',
-    'qr_code','upc_a','upc_e','pdf417','data_matrix','aztec','itf'
+    'code_128', 'code_39', 'code_93', 'ean_13', 'ean_8',
+    'qr_code', 'upc_a', 'upc_e', 'pdf417', 'data_matrix', 'aztec', 'itf'
   ];
   const detector = new BarcodeDetector({ formats });
 
@@ -177,7 +177,7 @@ function startBarcodeDetector(video) {
           handleScanResult(code);
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }, 200); // 5fps detection
 }
 
@@ -185,14 +185,14 @@ function startBarcodeDetector(video) {
 function startZxing(video) {
   try {
     zxingReader = new ZXing.BrowserMultiFormatReader();
-    const canvas  = document.getElementById('scannerCanvas');
-    const ctx     = canvas.getContext('2d');
+    const canvas = document.getElementById('scannerCanvas');
+    const ctx = canvas.getContext('2d');
 
     scannerTimer = setInterval(() => {
       if (!scannerActive || scanCooldown) return;
       if (video.readyState < 2) return;
 
-      canvas.width  = video.videoWidth  || 640;
+      canvas.width = video.videoWidth || 640;
       canvas.height = video.videoHeight || 480;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
@@ -245,7 +245,7 @@ async function handleScanResult(code) {
     // Show success flash in scanner
     const overlay = document.getElementById('scannerOverlay');
     overlay.classList.add('found');
-    document.getElementById('srName').textContent  = item.emoji + ' ' + item.name;
+    document.getElementById('srName').textContent = item.emoji + ' ' + item.name;
     document.getElementById('srPrice').textContent = fmt(item.on_sale && item.sale_price ? item.sale_price : item.price);
     document.getElementById('scannerResult').classList.add('show');
 
@@ -254,7 +254,7 @@ async function handleScanResult(code) {
     addToCart({
       id: item.id, name: item.name, sku: item.sku,
       emoji: item.emoji, price: effPrice,
-      tax_rate: item.tax_rate || 10,
+      tax_rate: item.tax_rate || 0,
       track_stock: item.track_stock, stock_qty: item.stock_qty
     });
 
@@ -266,7 +266,7 @@ async function handleScanResult(code) {
         overlay.classList.remove('found');
         document.getElementById('scannerResult').classList.remove('show');
         setStatus('Point camera at barcode');
-        scanCooldown  = false;
+        scanCooldown = false;
         lastScannedCode = '';
       }
     }, 1500);
@@ -279,7 +279,7 @@ async function handleScanResult(code) {
     setTimeout(() => {
       if (scannerActive) {
         setStatus('Point camera at barcode');
-        scanCooldown  = false;
+        scanCooldown = false;
         lastScannedCode = '';
       }
     }, 2200);
