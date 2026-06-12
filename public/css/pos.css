@@ -1913,15 +1913,16 @@ body {
     pointer-events: all;
   }
 
-  .stock-count {
-    font-size: 12px;
-    color: var(--green);
-    margin-bottom: 4px;
-    display: inline-block;
-  }
+}
 
-  .stock-count.low {
-    color: var(--orange, #f59e0b);
-    font-weight: 600;
-  }
+.stock-count {
+  font-size: 12px;
+  color: var(--green);
+  margin-bottom: 4px;
+  display: inline-block;
+}
+
+.stock-count.low {
+  color: var(--orange, #f59e0b);
+  font-weight: 600;
 }
