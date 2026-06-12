@@ -150,6 +150,13 @@ function renderProducts(items) {
         : p.badge === 'new' ? '<span class="badge badge-new">✨ NEW</span>'
           : p.on_sale ? '<span class="badge badge-sale">SALE</span>' : '';
 
+    // Stock count display
+    const stockBadge = p.track_stock
+      ? (outOfStock
+        ? ''  // already shown via oos badge
+        : `<span class="stock-count ${parseInt(p.stock_qty) <= 5 ? 'low' : ''}">📦 ${p.stock_qty} left</span>`)
+      : '';
+
     // Include stock info in payload so addToCart can check it
     const pStr = JSON.stringify({
       id: p.id, name: p.name, sku: p.sku, emoji: p.emoji,
@@ -166,6 +173,7 @@ function renderProducts(items) {
           <div class="lv-txt"><div class="pcard-name">${hlText(p.name)}</div><div class="pcard-desc">${p.description || ''}</div></div>
           <span class="lv-sku">${p.sku}</span>
           ${bdg}
+          ${stockBadge}
           <div style="display:flex;align-items:center;gap:8px">${priceHtml}
             <button class="add-btn${outOfStock ? ' add-btn-oos' : ''}" onclick="event.stopPropagation();addToCart('${pStr}')">+</button>
           </div>
@@ -182,6 +190,7 @@ function renderProducts(items) {
       <div class="pcard-name">${hlText(p.name)}</div>
       <div class="pcard-desc">${p.description || ''}</div>
       <div class="pcard-sku">${p.sku}</div>
+      ${stockBadge}
       <div class="pcard-bot">${priceHtml}
         <button class="add-btn${outOfStock ? ' add-btn-oos' : ''}" onclick="event.stopPropagation();addToCart('${pStr}')">+</button>
       </div>
