@@ -307,11 +307,11 @@
         <div class="sc-lbl">Orders Today</div>
         <div class="sc-val b" id="sumCount">—</div>
       </div>
-      <div class="sc">
+      <div class="sc" id="revenueCard">
         <div class="sc-lbl">Revenue Today</div>
         <div class="sc-val g" id="sumRev">—</div>
       </div>
-      <div class="sc">
+      <div class="sc" id="avgOrderCard">
         <div class="sc-lbl">Avg. Order</div>
         <div class="sc-val" id="sumAvg">—</div>
       </div>
@@ -384,6 +384,11 @@
         document.getElementById('userAvatar').textContent = user.name.slice(0, 2).toUpperCase();
         document.getElementById('bizName').textContent = user.business?.name || 'SwiftPOS';
         window._currSym = user.business?.currency_sym || '€';
+
+        if (user.role === 'cashier') {
+          document.getElementById('revenueCard').style.display = 'none';
+          document.getElementById('avgOrderCard').style.display = 'none';
+        }
         buildNav(user.role, '/orders');
       } catch { window.location.href = '/login'; return; }
       startClock('clock');
