@@ -16,8 +16,12 @@
 
     .page-body {
       flex: 1;
+      min-height: 0;
+      /* CRITICAL — lets flexbox child shrink + scroll */
       overflow-y: auto;
-      padding: 16px 16px 80px
+      overflow-x: hidden;
+      padding: 16px 16px 80px;
+      -webkit-overflow-scrolling: touch;
     }
 
     .sum-grid {
