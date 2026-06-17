@@ -440,7 +440,11 @@
             placeholder="Product name"></div>
         <div class="fg" style="grid-column:1/-1"><label class="fl">Description</label><input class="input" id="eDesc"
             placeholder="Short description"></div>
-        <div class="fg"><label class="fl">SKU *</label><input class="input" id="eSku" placeholder="SKU001"></div>
+        <div class="fg" id="skuGroup">
+          <label class="fl">SKU</label>
+          <input class="input" id="eSku" placeholder="Auto-generated" style="color:var(--t2);background:var(--s3)"
+            readonly>
+        </div>
         <div class="fg"><label class="fl">Barcode</label><input class="input" id="eBarcode" placeholder="Optional">
         </div>
         <div class="fg"><label class="fl">Category *</label><select class="input" id="eCat"
@@ -585,7 +589,7 @@
       const lo = document.getElementById('lowOnly').checked;
       const f = allItems.filter(it => {
         if (cid && String(it.category_id) !== cid) return false;
-        if (lo && it.track_stock && parseInt(it.stock_qty) > parseInt(it.low_stock_alert)) return false;
+        if (lo && it.track_stock && parseFloat(it.stock_qty) > parseFloat(it.low_stock_alert)) return false;
         if (q && !it.name.toLowerCase().includes(q) && !it.sku.toLowerCase().includes(q)) return false;
         return true;
       });
@@ -597,7 +601,7 @@
         <td>${it.category_emoji || ''} ${it.category_name || ''}</td>
         <td class="mono">${fmt(it.price)}</td>
         <td class="mono" style="color:var(--t3)">${it.cost_price ? fmt(it.cost_price) : '—'}</td>
-        <td class="${it.track_stock && parseInt(it.stock_qty) <= parseInt(it.low_stock_alert) ? 'sl' : 'so'} mono">${it.track_stock ? it.stock_qty : '∞'}</td>
+        <td class="${it.track_stock && parseFloat(it.stock_qty) <= parseFloat(it.low_stock_alert) ? 'sl' : 'so'} mono">${it.track_stock ? it.stock_qty : '∞'}</td>
         <td><span class="badge ${it.is_active ? 'badge-ok' : 'badge-err'}">${it.is_active ? 'Active' : 'Hidden'}</span></td>
         <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="openEdit(${it.id})">Edit</button></td>
       </tr>`).join('')
@@ -613,6 +617,8 @@
       document.getElementById('eEmoji').value = '🛒';
       document.getElementById('eBadge').value = '';
       document.getElementById('eActive').value = '1';
+      document.getElementById('skuGroup').style.display = 'none';
+      document.getElementById('eSku').value = '';
       if (allCats.length) { document.getElementById('eCat').value = allCats[0].id; loadSubsFor(allCats[0].id); }
       document.getElementById('editModal').classList.add('open');
     }
@@ -644,23 +650,33 @@
       const payload = {
         name: document.getElementById('eName').value.trim(),
         description: document.getElementById('eDesc').value.trim(),
-        sku: document.getElementById('eSku').value.trim(),
         barcode: document.getElementById('eBarcode').value.trim() || null,
         category_id: parseInt(document.getElementById('eCat').value),
         subcategory_id: parseInt(document.getElementById('eSub').value) || null,
         price: parseFloat(document.getElementById('ePrice').value) || 0,
         cost_price: parseFloat(document.getElementById('eCost').value) || null,
-        stock_qty: parseInt(document.getElementById('eStock').value) || 0,
+        stock_qty: parseFloat(document.getElementById('eStock').value) || 0,
         tax_rate: parseFloat(document.getElementById('eTax').value) || 0,
         emoji: document.getElementById('eEmoji').value || '🛒',
         badge: document.getElementById('eBadge').value || null,
         is_active: parseInt(document.getElementById('eActive').value)
       };
-      if (!payload.name || !payload.sku) { showToast('Name and SKU are required', 'error'); return; }
+
+      // SKU only sent when editing — on create the server generates it
+      if (editId) payload.sku = document.getElementById('eSku').value.trim();
+
+      if (!payload.name) { showToast('Name is required', 'error'); return; }
+      // SKU validation only applies on edit
+      if (editId && !payload.sku) { showToast('SKU is required', 'error'); return; }
+
       try {
-        if (editId) await API.put(`/api/items/${editId}`, payload);
-        else await API.post('/api/items', payload);
-        showToast('✅ Item saved', 'success');
+        if (editId) {
+          await API.put(`/api/items/${editId}`, payload);
+          showToast('✅ Item saved', 'success');
+        } else {
+          const res = await API.post('/api/items', payload);
+          showToast(`✅ Item added · SKU: ${res.sku}`, 'success');
+        }
         closeEdit();
         await refreshAll();
       } catch (e) { showToast(e.message, 'error'); }
@@ -727,6 +743,7 @@
     function openEditCat(id) {
       const c = allCats.find(x => x.id === id); if (!c) return;
       editCatId = id;
+      document.getElementById('skuGroup').style.display = '';
       document.getElementById('catModalTitle').textContent = 'Edit Category';
       document.getElementById('cName').value = c.name;
       document.getElementById('cEmoji').value = c.emoji || '';

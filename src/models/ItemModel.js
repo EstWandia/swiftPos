@@ -1,5 +1,33 @@
 const { query, queryOne, run } = require('../config/database');
 
+// ── private helper ─────────────────────────────────────────────────────
+async function generateSku(business_id, category_id) {
+  const cat = await queryOne(
+    'SELECT name FROM categories WHERE id = ? AND business_id = ?',
+    [category_id, business_id]
+  );
+  const raw = (cat?.name || 'ITM').replace(/[^A-Za-z]/g, '').toUpperCase();
+  const prefix = raw.slice(0, 3).padEnd(3, 'X');
+
+  const row = await queryOne(
+    'SELECT COUNT(*) AS cnt FROM items WHERE business_id = ? AND category_id = ?',
+    [business_id, category_id]
+  );
+  let seq = (parseInt(row?.cnt) || 0) + 1;
+
+  let sku, collision;
+  do {
+    sku = `${prefix}-${String(seq).padStart(4, '0')}`;
+    collision = await queryOne(
+      'SELECT id FROM items WHERE business_id = ? AND sku = ?',
+      [business_id, sku]
+    );
+    if (collision) seq++;
+  } while (collision);
+
+  return sku;
+}
+
 const ItemModel = {
   async search(business_id, q) {
     const like = `%${q}%`;
@@ -36,10 +64,30 @@ const ItemModel = {
                      WHERE (i.sku=? OR i.barcode=?) AND i.business_id=? AND i.is_active=1`, [sku, sku, business_id]);
   },
   async create(business_id, data) {
-    const { category_id, subcategory_id = null, name, description = null, sku, barcode = null, price, cost_price = null, sale_price = null, on_sale = 0, stock_qty = 0, low_stock_alert = 10, track_stock = 1, emoji = '🛒', tax_rate = 0, badge = null, is_popular = 0 } = data;
-    return run(`INSERT INTO items (business_id,category_id,subcategory_id,name,description,sku,barcode,price,cost_price,sale_price,on_sale,stock_qty,low_stock_alert,track_stock,emoji,tax_rate,badge,is_popular)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [business_id, category_id, subcategory_id, name, description, sku, barcode, price, cost_price, sale_price, on_sale, stock_qty, low_stock_alert, track_stock, emoji, tax_rate, badge, is_popular]);
+    const {
+      category_id, subcategory_id = null,
+      name, description = null,
+      /* sku intentionally ignored — always generated */ barcode = null,
+      price, cost_price = null, sale_price = null, on_sale = 0,
+      stock_qty = 0, low_stock_alert = 10, track_stock = 1,
+      emoji = '🛒', tax_rate = 0, badge = null, is_popular = 0
+    } = data;
+
+    const sku = await generateSku(business_id, category_id); // ← generated here
+
+    const result = await run(
+      `INSERT INTO items
+         (business_id,category_id,subcategory_id,name,description,sku,barcode,
+          price,cost_price,sale_price,on_sale,stock_qty,low_stock_alert,
+          track_stock,emoji,tax_rate,badge,is_popular)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [business_id, category_id, subcategory_id, name, description,
+        sku, barcode, price, cost_price, sale_price, on_sale,
+        stock_qty, low_stock_alert, track_stock, emoji, tax_rate, badge, is_popular]
+    );
+
+    result.sku = sku; // attach so controller can return it to the client
+    return result;
   },
   async update(id, business_id, data) {
     const item = await this.getById(id, business_id);
