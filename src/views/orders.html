@@ -7,17 +7,20 @@
   <title>SwiftPOS — Orders</title>
   <link rel="stylesheet" href="/css/main.css">
   <style>
+    html {
+      height: 100%;
+    }
+
     body {
       display: flex;
       flex-direction: column;
       height: 100%;
-      overflow: hidden
+      overflow: hidden;
     }
 
     .page-body {
       flex: 1;
       min-height: 0;
-      /* CRITICAL — lets flexbox child shrink + scroll */
       overflow-y: auto;
       overflow-x: hidden;
       padding: 16px 16px 80px;
@@ -85,7 +88,8 @@
 
     table {
       width: 100%;
-      border-collapse: collapse
+      border-collapse: collapse;
+      min-width: 600px
     }
 
     th {
@@ -340,7 +344,7 @@
       <button class="btn btn-ghost" onclick="clearFilters()">Clear</button>
       <button class="btn btn-primary ml-auto" onclick="location.href='/'">+ New Order</button>
     </div>
-    <div style="overflow-x:auto">
+    <div style="overflow-x:auto;min-width:0">
       <table>
         <thead>
           <tr>
