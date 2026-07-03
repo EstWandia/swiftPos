@@ -504,10 +504,9 @@
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${order.status === 'completed' ? `<button class="btn btn-danger" onclick="updStatus(${order.id},'cancelled')">Cancel Order</button>` : ''}
-        ${order.status === 'cancelled' || order.status === 'completed' ? `<button class="btn btn-ghost" onclick="updStatus(${order.id},'refunded')">Mark Refunded</button>` : ''}
+        ${order.status === 'cancelled' || order.status === 'completed' ? `<button class="btn btn-ghost" onclick="updStatus(${order.id},'refunded')">Mark Returned</button>` : ''}
         <button class="btn btn-ghost ml-auto" onclick="closeDetail()">Close</button>
-      </div>`;
+        </div>`;
       } catch (e) { document.getElementById('ddBody').innerHTML = `<p style="color:var(--red);padding:20px">${e.message}</p>`; }
     }
     async function returnItem(orderId, itemId, maxQty, name) {
