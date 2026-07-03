@@ -1311,8 +1311,11 @@
       <td class="mono" style="color:var(--red)">${fmt(r.line_total)}</td>
       <td>${r.cashier_name}</td>
       <td style="color:var(--t2);font-size:12px">${r.return_reason || '—'}</td>
-      <td style="color:var(--t3);font-size:11px">${dateStr(r.returned_at)}</td>
-    </tr>`).join('');
+      <td style="color:var(--t3);font-size:11px">${dateStr(r.return_requested_at)}</td>
+  <td>${r.state == 1
+            ? `<button class="btn btn-primary" style="padding:4px 10px;font-size:11px" onclick="confirmReturn(${r.sold_item_id})">✔ Confirm</button>`
+            : `<span class="badge s-completed">Restocked</span>`}</td>
+</tr>`).join('');
         document.getElementById('returnedCards').innerHTML = rows.map(r => `<div class="m-card">
       <div class="m-card-top">
         <div class="m-card-name">${r.emoji || '🛒'} ${r.item_name}</div>
@@ -1324,8 +1327,16 @@
         <span class="m-tag amber">${r.cashier_name}</span>
       </div>
       ${r.return_reason ? `<div style="font-size:11px;color:var(--t2);margin-top:6px">Reason: ${r.return_reason}</div>` : ''}
-      <div style="font-size:10px;color:var(--t3);margin-top:4px">${dateStr(r.returned_at)}</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:4px">${dateStr(r.return_requested_at)}</div>
     </div>`).join('');
+      } catch (e) { showToast(e.message, 'error'); }
+    }
+    async function confirmReturn(soldItemId) {
+      if (!confirm('Confirm this return? The item quantity will be added back to stock.')) return;
+      try {
+        await API.post(`/api/analytics/returned/${soldItemId}/confirm`);
+        showToast('Item restocked', 'success');
+        loadReturned();
       } catch (e) { showToast(e.message, 'error'); }
     }
   </script>

@@ -490,6 +490,7 @@
           <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i.name}</div>
             <div style="font-size:11px;color:var(--t2)">${i.sku} · ×${i.quantity} · ${fmt(i.price)} ea</div></div>
           <span class="mono" style="font-size:13px;font-weight:700;color:var(--a)">${fmt(i.line_total)}</span>
+          ${order.status === 'completed' ? `<button class="btn btn-ghost" style="padding:4px 8px;font-size:11px" onclick="returnItem(${order.id}, ${i.item_id}, ${i.quantity}, '${(i.name || '').replace(/'/g, "\\'")}')">↩</button>` : ''}
         </div>`).join('')}
       </div>
       <div class="ds"><h4>Totals</h4>
@@ -508,6 +509,16 @@
         <button class="btn btn-ghost ml-auto" onclick="closeDetail()">Close</button>
       </div>`;
       } catch (e) { document.getElementById('ddBody').innerHTML = `<p style="color:var(--red);padding:20px">${e.message}</p>`; }
+    }
+    async function returnItem(orderId, itemId, maxQty, name) {
+      const qty = parseInt(prompt(`Return how many "${name}"? (max ${maxQty})`, '1'));
+      if (!qty || qty <= 0 || qty > maxQty) return;
+      const reason = prompt('Reason for return (optional):') || null;
+      try {
+        await API.post(`/api/orders/${orderId}/items/${itemId}/return`, { quantity: qty, reason });
+        showToast('Item marked as returned', 'success');
+        openDetail(orderId);
+      } catch (e) { showToast(e.message, 'error'); }
     }
 
     async function updStatus(id, status) {

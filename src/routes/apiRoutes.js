@@ -252,40 +252,126 @@ router.get('/analytics/dead-stock', requireAdmin, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 4. Returned Items — orders with status=refunded + sold_items with state=1
+// // 4. Returned Items — orders with status=refunded + sold_items with state=1
+// router.get('/analytics/returned', requireAdmin, async (req, res) => {
+//   try {
+//     const { date_from, date_to } = req.query;
+//     const today = new Date().toISOString().split('T')[0];
+//     const df = date_from || today.slice(0, 8) + '01';
+//     const dt = date_to || today;
+//     // Items in refunded orders
+//     const rows = await query(`
+//       SELECT
+//         oi.name        AS item_name,
+//         oi.sku         AS item_sku,
+//         i.emoji,
+//         c.name         AS category_name,
+//         oi.quantity,
+//         oi.price       AS unit_price,
+//         oi.line_total,
+//         o.order_number,
+//         o.status,
+//         u.name         AS cashier_name,
+//         o.notes        AS return_reason,
+//         o.updated_at   AS returned_at,
+//         o.created_at
+//       FROM order_items oi
+//       JOIN orders o      ON o.id = oi.order_id
+//       JOIN items i       ON i.id = oi.item_id
+//       JOIN categories c  ON c.id = i.category_id
+//       JOIN users u       ON u.id = o.cashier_id
+//       WHERE o.business_id = ?
+//         AND o.status = 'refunded'
+//         AND DATE(o.updated_at) >= ? AND DATE(o.updated_at) <= ?
+//       ORDER BY o.updated_at DESC
+//     `, [bid(req), df, dt]);
+//     res.json({ rows });
+//   } catch (e) { res.status(500).json({ error: e.message }); }
+// });
+
+// ── Partial Returns ──────────────────────────────────────────────────
+
+// Mark a quantity of one order line as "return requested"
+router.post('/orders/:orderId/items/:itemId/return', requireAdmin, async (req, res) => {
+  try {
+    const { quantity, reason = null } = req.body;
+    const qty = parseInt(quantity);
+    if (!qty || qty <= 0) return res.status(400).json({ error: 'Quantity must be greater than 0' });
+
+    const soldItem = await queryOne(
+      `SELECT * FROM sold_items WHERE order_id=? AND item_id=? AND business_id=? AND state=0 LIMIT 1`,
+      [req.params.orderId, req.params.itemId, bid(req)]
+    );
+    if (!soldItem) return res.status(404).json({ error: 'Sold item not found or already returned' });
+    if (qty > soldItem.quantity) return res.status(400).json({ error: `Cannot return more than ${soldItem.quantity} sold` });
+
+    if (qty === soldItem.quantity) {
+      // whole line returned
+      await run(
+        `UPDATE sold_items
+         SET state=1, returned_qty=?, return_reason=?, return_requested_by=?, return_requested_at=NOW()
+         WHERE id=?`,
+        [qty, reason, req.session.user.id, soldItem.id]
+      );
+    } else {
+      // partial: shrink original sold row, split off a new "return requested" row
+      const remaining = soldItem.quantity - qty;
+      await run(
+        `UPDATE sold_items SET quantity=?, line_total=? WHERE id=?`,
+        [remaining, (soldItem.unit_price * remaining).toFixed(2), soldItem.id]
+      );
+      await run(
+        `INSERT INTO sold_items
+           (business_id, item_id, order_id, order_number, cashier_id, cashier_name,
+            item_name, item_sku, category_name, quantity, unit_price, line_total, sold_at,
+            state, return_reason, returned_qty, return_requested_by, return_requested_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,NOW())`,
+        [bid(req), soldItem.item_id, soldItem.order_id, soldItem.order_number, soldItem.cashier_id, soldItem.cashier_name,
+        soldItem.item_name, soldItem.item_sku, soldItem.category_name, qty, soldItem.unit_price,
+        (soldItem.unit_price * qty).toFixed(2), soldItem.sold_at, reason, qty, req.session.user.id]
+      );
+    }
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Returned Items list — item-level, driven purely by sold_items.state
 router.get('/analytics/returned', requireAdmin, async (req, res) => {
   try {
     const { date_from, date_to } = req.query;
     const today = new Date().toISOString().split('T')[0];
     const df = date_from || today.slice(0, 8) + '01';
     const dt = date_to || today;
-    // Items in refunded orders
     const rows = await query(`
       SELECT
-        oi.name        AS item_name,
-        oi.sku         AS item_sku,
-        i.emoji,
-        c.name         AS category_name,
-        oi.quantity,
-        oi.price       AS unit_price,
-        oi.line_total,
-        o.order_number,
-        o.status,
-        u.name         AS cashier_name,
-        o.notes        AS return_reason,
-        o.updated_at   AS returned_at,
-        o.created_at
-      FROM order_items oi
-      JOIN orders o      ON o.id = oi.order_id
-      JOIN items i       ON i.id = oi.item_id
-      JOIN categories c  ON c.id = i.category_id
-      JOIN users u       ON u.id = o.cashier_id
-      WHERE o.business_id = ?
-        AND o.status = 'refunded'
-        AND DATE(o.updated_at) >= ? AND DATE(o.updated_at) <= ?
-      ORDER BY o.updated_at DESC
+        si.id AS sold_item_id, si.item_name, si.item_sku, si.category_name, i.emoji,
+        si.returned_qty AS quantity, si.line_total,
+        si.order_number, si.cashier_name,
+        si.return_reason, si.state, si.return_requested_at, si.restocked_at
+      FROM sold_items si
+      LEFT JOIN items i ON i.id = si.item_id AND i.business_id = si.business_id
+      WHERE si.business_id = ?
+        AND si.state IN (1,2)
+        AND DATE(si.return_requested_at) BETWEEN ? AND ?
+      ORDER BY si.return_requested_at DESC
     `, [bid(req), df, dt]);
     res.json({ rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Confirm return → restock item, lock the row
+router.post('/analytics/returned/:soldItemId/confirm', requireAdmin, async (req, res) => {
+  try {
+    const soldItem = await queryOne(
+      'SELECT * FROM sold_items WHERE id=? AND business_id=? AND state=1',
+      [req.params.soldItemId, bid(req)]
+    );
+    if (!soldItem) return res.status(404).json({ error: 'Return not found or already confirmed' });
+    await run('UPDATE items SET stock_qty = stock_qty + ? WHERE id=? AND business_id=?',
+      [soldItem.returned_qty, soldItem.item_id, bid(req)]);
+    await run('UPDATE sold_items SET state=2, restocked_by=?, restocked_at=NOW() WHERE id=?',
+      [req.session.user.id, soldItem.id]);
+    res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
