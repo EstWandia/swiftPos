@@ -78,6 +78,7 @@ router.delete('/subcategories/:id', requireAdmin, async (req, res) => {
 // ── Analytics ──────────────────────────────────────────────────────────
 
 // 1. Daily Report — fixed daily expenditure auto-applied to every day
+// 1. Daily Report — fixed daily expenditure auto-applied to every day (including no-sale days)
 router.get('/analytics/daily', requireAdmin, async (req, res) => {
   try {
     const { date_from, date_to } = req.query;
@@ -94,14 +95,9 @@ router.get('/analytics/daily', requireAdmin, async (req, res) => {
     );
     const fixedDaily = parseFloat(expRow?.fixed_daily || 0);
 
-    // NOTE: Join through order_items → orders so we can filter out refunded orders reliably.
-    // We do NOT use si.state (column may not exist in older installs).
-    // gross_profit = revenue − cost_of_goods. If cost_price is NULL, we treat margin as 100%
-    // (i.e. full line_total is profit) so the number is always meaningful.
     const rows = await query(`
       SELECT
         DATE(si.sold_at)                                                AS sale_date,
-        DAYNAME(si.sold_at)                                             AS sale_day,
         CAST(COALESCE(SUM(si.line_total), 0) AS DECIMAL(12,2))         AS total_sale,
         CAST(COALESCE(SUM(si.quantity), 0) AS UNSIGNED)                AS quantity,
         CAST(COALESCE(
@@ -109,27 +105,55 @@ router.get('/analytics/daily', requireAdmin, async (req, res) => {
             si.line_total -
             (COALESCE(i.cost_price, si.unit_price * 0.6) * si.quantity)
           ), 0
-        ) AS DECIMAL(12,2))                                            AS gross_profit,
-        MIN(si.sold_at)                                                 AS created_at
+        ) AS DECIMAL(12,2))                                            AS gross_profit
       FROM sold_items si
       LEFT JOIN items i ON i.id = si.item_id AND i.business_id = si.business_id
       LEFT JOIN orders o ON o.id = si.order_id
       WHERE si.business_id = ?
         AND DATE(si.sold_at) >= ? AND DATE(si.sold_at) <= ?
         AND (o.status IS NULL OR o.status NOT IN ('refunded', 'cancelled'))
-      GROUP BY DATE(si.sold_at), DAYNAME(si.sold_at)
-      ORDER BY sale_date DESC
+      GROUP BY DATE(si.sold_at)
     `, [bid(req), df, dt]);
 
-    // Attach fixed daily expenditure and calculate net profit per row
-    const result = rows.map(r => ({
-      ...r,
-      total_sale: parseFloat(r.total_sale) || 0,
-      gross_profit: parseFloat(r.gross_profit) || 0,
-      quantity: parseInt(r.quantity) || 0,
-      total_expenditure: fixedDaily,
-      net_profit: +((parseFloat(r.gross_profit) || 0) - fixedDaily).toFixed(2)
-    }));
+    // ── Build a lookup keyed by YYYY-MM-DD, timezone-safe ──
+    const pad = n => String(n).padStart(2, '0');
+    const fmtDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const parseYMD = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+
+    const dateMap = new Map();
+    rows.forEach(r => {
+      const key = r.sale_date instanceof Date ? fmtDate(r.sale_date) : String(r.sale_date).slice(0, 10);
+      dateMap.set(key, r);
+    });
+
+    // ── Walk every calendar day in the range, filling gaps with zero-sale rows ──
+    const result = [];
+    const cursor = parseYMD(df);
+    const end = parseYMD(dt);
+    while (cursor <= end) {
+      const key = fmtDate(cursor);
+      const dayName = cursor.toLocaleDateString('en-US', { weekday: 'long' });
+      const existing = dateMap.get(key);
+
+      const totalSale = existing ? parseFloat(existing.total_sale) || 0 : 0;
+      const grossProfit = existing ? parseFloat(existing.gross_profit) || 0 : 0;
+      const quantity = existing ? parseInt(existing.quantity) || 0 : 0;
+
+      result.push({
+        sale_date: key,
+        sale_day: dayName,
+        total_sale: totalSale,
+        gross_profit: grossProfit,
+        quantity: quantity,
+        total_expenditure: fixedDaily,
+        net_profit: +((grossProfit) - fixedDaily).toFixed(2)
+      });
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    // Keep DESC order to match the original behaviour
+    result.reverse();
 
     res.json({ rows: result, fixed_daily: fixedDaily });
   } catch (e) {
