@@ -473,6 +473,12 @@
             <option value="0">No (hidden)</option>
           </select>
         </div>
+        <div class="fg" style="grid-column:1/-1">
+          <label class="fl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="eSoldByHalf" style="width:16px;height:16px;margin:0">
+            Sold in halves / fractions (e.g. 0.5, 1.5, 1.09)
+          </label>
+        </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn btn-primary" style="flex:1" onclick="saveItem()">Save Item</button>
@@ -596,7 +602,7 @@
       document.getElementById('invCount').textContent = `${f.length} of ${allItems.length} items`;
       document.getElementById('invBody').innerHTML = f.length
         ? f.map(it => `<tr>
-        <td><span style="font-size:17px">${it.emoji}</span> <strong>${it.name}</strong><div style="font-size:11px;color:var(--t3)">${it.description || ''}</div></td>
+        <td><span style="font-size:17px">${it.emoji}</span> <strong>${it.name}</strong>${it.sold_by_half ? '<span class="badge" style="margin-left:6px;font-size:9px;padding:2px 6px" title="Sold in halves/fractions">½</span>' : ''}<div style="font-size:11px;color:var(--t3)">${it.description || ''}</div></td>
        ${false ? `<td class="mono" style="color:var(--t2)">${it.sku}</td>` : ''}
         <td>${it.category_emoji || ''} ${it.category_name || ''}</td>
         <td class="mono">${fmt(it.price)}</td>
@@ -617,6 +623,7 @@
       document.getElementById('eEmoji').value = '🛒';
       document.getElementById('eBadge').value = '';
       document.getElementById('eActive').value = '1';
+      document.getElementById('eSoldByHalf').checked = false;
       document.getElementById('skuGroup').style.display = 'none';
       document.getElementById('eSku').value = '';
       if (allCats.length) { document.getElementById('eCat').value = allCats[0].id; loadSubsFor(allCats[0].id); }
@@ -638,6 +645,7 @@
       document.getElementById('eEmoji').value = it.emoji || '🛒';
       document.getElementById('eBadge').value = it.badge || '';
       document.getElementById('eActive').value = it.is_active ? '1' : '0';
+      document.getElementById('eSoldByHalf').checked = !!it.sold_by_half;
       document.getElementById('eCat').value = it.category_id;
       loadSubsFor(it.category_id);
       setTimeout(() => document.getElementById('eSub').value = it.subcategory_id || '', 80);
@@ -659,7 +667,8 @@
         tax_rate: parseFloat(document.getElementById('eTax').value) || 0,
         emoji: document.getElementById('eEmoji').value || '🛒',
         badge: document.getElementById('eBadge').value || null,
-        is_active: parseInt(document.getElementById('eActive').value)
+        is_active: parseInt(document.getElementById('eActive').value),
+        sold_by_half: document.getElementById('eSoldByHalf').checked ? 1 : 0
       };
 
       // SKU only sent when editing — on create the server generates it

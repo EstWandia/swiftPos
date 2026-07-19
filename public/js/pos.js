@@ -157,11 +157,15 @@ function renderProducts(items) {
         : `<span class="stock-count ${parseInt(p.stock_qty) <= 5 ? 'low' : ''}">📦 ${p.stock_qty} left</span>`)
       : '';
 
+    // Small indicator for items sold in halves/fractions (shown alongside other badges)
+    const halfBadge = p.sold_by_half ? '<span class="badge" style="background:#fff;color:var(--t2)" title="Sold in halves/fractions">½ qty</span>' : '';
+
     // Include stock info in payload so addToCart can check it
     const pStr = JSON.stringify({
       id: p.id, name: p.name, sku: p.sku, emoji: p.emoji,
       price: effPrice, tax_rate: p.tax_rate || 0,
-      track_stock: p.track_stock, stock_qty: p.stock_qty
+      track_stock: p.track_stock, stock_qty: p.stock_qty,
+      sold_by_half: p.sold_by_half || 0
     }).replace(/"/g, '&quot;');
 
     const oosClass = outOfStock ? ' oos' : '';
@@ -173,6 +177,7 @@ function renderProducts(items) {
           <div class="lv-txt"><div class="pcard-name">${hlText(p.name)}</div><div class="pcard-desc">${p.description || ''}</div></div>
           <span class="lv-sku">${p.sku}</span>
           ${bdg}
+          ${halfBadge}
           ${stockBadge}
           <div style="display:flex;align-items:center;gap:8px">${priceHtml}
             <button class="add-btn${outOfStock ? ' add-btn-oos' : ''}" onclick="event.stopPropagation();addToCart('${pStr}')">+</button>
@@ -185,7 +190,7 @@ function renderProducts(items) {
       <button class="fav-btn ${isFav ? 'on' : ''}" onclick="event.stopPropagation();toggleFav(${p.id})">${isFav ? '⭐' : '☆'}</button>
       <div class="pcard-top">
         <span class="pcard-emoji">${p.emoji}</span>
-        <div class="pcard-badges">${bdg}</div>
+        <div class="pcard-badges">${bdg}${halfBadge}</div>
       </div>
       <div class="pcard-name">${hlText(p.name)}</div>
       <div class="pcard-desc">${p.description || ''}</div>
@@ -236,7 +241,7 @@ async function buildSDD(q) {
     } else {
       dd.innerHTML = '<div class="sdd-sec">Quick Add</div>' + top.map((p, i) => {
         const ep = p.on_sale && p.sale_price ? parseFloat(p.sale_price) : parseFloat(p.price);
-        const pStr = JSON.stringify({ id: p.id, name: p.name, sku: p.sku, emoji: p.emoji, price: ep, tax_rate: p.tax_rate || 0 }).replace(/"/g, '&quot;');
+        const pStr = JSON.stringify({ id: p.id, name: p.name, sku: p.sku, emoji: p.emoji, price: ep, tax_rate: p.tax_rate || 0, track_stock: p.track_stock, stock_qty: p.stock_qty, sold_by_half: p.sold_by_half || 0 }).replace(/"/g, '&quot;');
         return `<div class="sdd-item" id="sdi-${i}" onclick="addToCart('${pStr}');closeSDD();closeMobSearch()">
           <span class="sdd-e">${p.emoji}</span>
           <div class="sdd-inf"><div class="sdd-n">${p.name}</div><div class="sdd-m">${p.category_name || ''}</div></div>
@@ -338,16 +343,48 @@ function addToCart(product) {
     return;
   }
 
+  // Halves/fractions item — collect exact decimal quantity via popup, don't add 1 straight away
+  if (product.sold_by_half) {
+    openHalfQtyModal(product);
+    return;
+  }
+
+  addToCartWithQty(product, 1);
+}
+
+// Adds (or increments) a product in the cart by a specific quantity.
+// Used directly for normal items (qty=1) and by the half/fraction popup.
+function addToCartWithQty(product, qty) {
+  qty = parseFloat(qty);
+  if (!qty || qty <= 0) return;
+
   const ex = cart.find(i => i.id === product.id);
-  if (ex) { ex.qty++; }
+
+  // Don't let the cart exceed what's actually in stock (fast client-side check;
+  // the server re-validates this authoritatively at checkout regardless).
+  if (product.track_stock) {
+    const already = ex ? ex.qty : 0;
+    const avail = parseFloat(product.stock_qty);
+    if (already + qty > avail) {
+      const room = +(avail - already).toFixed(2);
+      showToast(room > 0
+        ? `❌ Only ${room} more ${product.name} in stock`
+        : `❌ ${product.name} is already fully in your cart (${avail} in stock)`, 'error');
+      return;
+    }
+  }
+
+  if (ex) { ex.qty = +(ex.qty + qty).toFixed(2); }
   else cart.push({
     id: product.id, name: product.name, sku: product.sku,
     emoji: product.emoji, price: parseFloat(product.price),
-    tax_rate: parseFloat(product.tax_rate) || 0, qty: 1
+    tax_rate: parseFloat(product.tax_rate) || 0, qty: +qty.toFixed(2),
+    sold_by_half: product.sold_by_half || 0,
+    track_stock: product.track_stock || 0, stock_qty: product.stock_qty
   });
 
   // Update recents (business-scoped)
-  const slim = { id: product.id, name: product.name, emoji: product.emoji, price: parseFloat(product.price), sku: product.sku, tax_rate: parseFloat(product.tax_rate) || 0 };
+  const slim = { id: product.id, name: product.name, emoji: product.emoji, price: parseFloat(product.price), sku: product.sku, tax_rate: parseFloat(product.tax_rate) || 0, sold_by_half: product.sold_by_half || 0 };
   recents = [slim, ...recents.filter(r => r.id !== product.id)].slice(0, 8);
   saveRecents(); renderRecents();
 
@@ -356,13 +393,58 @@ function addToCart(product) {
   showToast(`${product.emoji} ${product.name} added`, 'success');
 }
 
+// ── Half / fraction quantity popup ────────────────────
+let _halfQtyProduct = null;
+
+function openHalfQtyModal(product) {
+  _halfQtyProduct = product;
+  document.getElementById('hqEmoji').textContent = product.emoji || '🛒';
+  document.getElementById('hqName').textContent = product.name;
+  const inp = document.getElementById('hqInput');
+  inp.value = '';
+  document.getElementById('halfQtyOverlay').classList.add('open');
+  setTimeout(() => inp.focus(), 100);
+}
+
+function closeHalfQtyModal(e) {
+  // Ignore clicks on the box itself; only close on backdrop click or explicit call
+  if (e && e.target !== document.getElementById('halfQtyOverlay')) return;
+  document.getElementById('halfQtyOverlay').classList.remove('open');
+  _halfQtyProduct = null;
+}
+
+function setHalfQtyVal(v) {
+  document.getElementById('hqInput').value = v;
+  document.getElementById('hqInput').focus();
+}
+
+function confirmHalfQty() {
+  const val = parseFloat(document.getElementById('hqInput').value);
+  if (!val || val <= 0) { showToast('Enter a valid quantity', 'error'); return; }
+  if (!_halfQtyProduct) return;
+
+  addToCartWithQty(_halfQtyProduct, val);
+  document.getElementById('halfQtyOverlay').classList.remove('open');
+  _halfQtyProduct = null;
+}
+
 function changeQty(id, delta) {
   const item = cart.find(i => i.id === id);
   if (!item) return;
-  item.qty += delta;
+  // Halves/fraction items step by 0.5 instead of whole units
+  const step = item.sold_by_half ? 0.5 * Math.sign(delta) : delta;
+  const next = +(item.qty + step).toFixed(2);
+
+  if (step > 0 && item.track_stock && next > parseFloat(item.stock_qty)) {
+    showToast(`❌ Only ${item.stock_qty} ${item.name} in stock`, 'error');
+    return;
+  }
+
+  item.qty = next;
   if (item.qty <= 0) cart = cart.filter(i => i.id !== id);
   renderCart(); updateFab(false);
 }
+
 
 function removeItem(id) {
   cart = cart.filter(i => i.id !== id);

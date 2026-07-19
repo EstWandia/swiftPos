@@ -255,7 +255,8 @@ async function handleScanResult(code) {
       id: item.id, name: item.name, sku: item.sku,
       emoji: item.emoji, price: effPrice,
       tax_rate: item.tax_rate || 0,
-      track_stock: item.track_stock, stock_qty: item.stock_qty
+      track_stock: item.track_stock, stock_qty: item.stock_qty,
+      sold_by_half: item.sold_by_half || 0
     });
 
     setStatus('✓ Added: ' + item.name);

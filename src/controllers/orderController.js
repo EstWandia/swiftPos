@@ -1,6 +1,7 @@
 const OrderModel = require('../models/OrderModel');
 const DiscountModel = require('../models/DiscountModel');
 const SoldItemModel = require('../models/SoldItemModel');
+const ItemModel = require('../models/ItemModel');
 
 const bid = req => req.session.user.business_id;
 
@@ -13,10 +14,26 @@ const OrderController = {
       return res.status(400).json({ error: 'No items in order' });
 
     try {
+      // Server-side stock check — never trust the cart totals sent from the client.
+      // Combine quantities in case the same item appears more than once in the payload.
+      const qtyByItem = {};
+      for (const i of items) {
+        qtyByItem[i.item_id] = (qtyByItem[i.item_id] || 0) + parseFloat(i.quantity);
+      }
+      for (const itemId of Object.keys(qtyByItem)) {
+        const dbItem = await ItemModel.getById(parseInt(itemId), bid(req));
+        if (!dbItem) return res.status(400).json({ error: `Item ${itemId} not found` });
+        if (dbItem.track_stock && qtyByItem[itemId] > parseFloat(dbItem.stock_qty)) {
+          return res.status(400).json({
+            error: `Not enough stock for ${dbItem.name} — only ${dbItem.stock_qty} left, ${qtyByItem[itemId]} requested`
+          });
+        }
+      }
+
       let dc = null, dv = 0, dt = null;
 
       if (discount_code?.trim()) {
-        const subtotal = items.reduce((s, i) => s + parseFloat(i.price) * parseInt(i.quantity), 0);
+        const subtotal = items.reduce((s, i) => s + parseFloat(i.price) * parseFloat(i.quantity), 0);
         const check = await DiscountModel.validate(bid(req), discount_code.trim().toUpperCase(), subtotal);
         if (!check.valid) return res.status(400).json({ error: check.message });
         dt = check.discount.type;

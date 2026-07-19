@@ -69,7 +69,7 @@ const ItemModel = {
       name, description = null,
       /* sku intentionally ignored — always generated */ barcode = null,
       price, cost_price = null, sale_price = null, on_sale = 0,
-      stock_qty = 0, low_stock_alert = 10, track_stock = 1,
+      stock_qty = 0, low_stock_alert = 10, track_stock = 1, sold_by_half = 0,
       emoji = '🛒', tax_rate = 0, badge = null, is_popular = 0
     } = data;
 
@@ -79,11 +79,11 @@ const ItemModel = {
       `INSERT INTO items
          (business_id,category_id,subcategory_id,name,description,sku,barcode,
           price,cost_price,sale_price,on_sale,stock_qty,low_stock_alert,
-          track_stock,emoji,tax_rate,badge,is_popular)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          track_stock,sold_by_half,emoji,tax_rate,badge,is_popular)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [business_id, category_id, subcategory_id, name, description,
         sku, barcode, price, cost_price, sale_price, on_sale,
-        stock_qty, low_stock_alert, track_stock, emoji, tax_rate, badge, is_popular]
+        stock_qty, low_stock_alert, track_stock, sold_by_half, emoji, tax_rate, badge, is_popular]
     );
 
     result.sku = sku; // attach so controller can return it to the client
@@ -93,8 +93,8 @@ const ItemModel = {
     const item = await this.getById(id, business_id);
     if (!item) return null;
     const m = { ...item, ...data };
-    return run(`UPDATE items SET category_id=?,subcategory_id=?,name=?,description=?,sku=?,barcode=?,price=?,cost_price=?,sale_price=?,on_sale=?,stock_qty=?,low_stock_alert=?,track_stock=?,emoji=?,tax_rate=?,badge=?,is_popular=?,is_active=?,updated_at=NOW() WHERE id=? AND business_id=?`,
-      [m.category_id, m.subcategory_id, m.name, m.description, m.sku, m.barcode, m.price, m.cost_price, m.sale_price, m.on_sale, m.stock_qty, m.low_stock_alert, m.track_stock, m.emoji, m.tax_rate, m.badge, m.is_popular, m.is_active, id, business_id]);
+    return run(`UPDATE items SET category_id=?,subcategory_id=?,name=?,description=?,sku=?,barcode=?,price=?,cost_price=?,sale_price=?,on_sale=?,stock_qty=?,low_stock_alert=?,track_stock=?,sold_by_half=?,emoji=?,tax_rate=?,badge=?,is_popular=?,is_active=?,updated_at=NOW() WHERE id=? AND business_id=?`,
+      [m.category_id, m.subcategory_id, m.name, m.description, m.sku, m.barcode, m.price, m.cost_price, m.sale_price, m.on_sale, m.stock_qty, m.low_stock_alert, m.track_stock, m.sold_by_half, m.emoji, m.tax_rate, m.badge, m.is_popular, m.is_active, id, business_id]);
   },
   async delete(id, business_id) {
     return run('UPDATE items SET is_active=0 WHERE id=? AND business_id=?', [id, business_id]);

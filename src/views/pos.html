@@ -219,6 +219,26 @@
     </div>
   </div>
 
+  <!-- HALF / FRACTION QUANTITY MODAL -->
+  <div class="cust-modal" id="halfQtyOverlay" onclick="closeHalfQtyModal(event)">
+    <div class="cm-box" style="max-width:340px" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between" style="margin-bottom:14px">
+        <h3 style="font-size:15px"><span id="hqEmoji"></span> <span id="hqName"></span></h3>
+        <button class="od-close" onclick="closeHalfQtyModal()">✕</button>
+      </div>
+      <label class="fl">Enter quantity (e.g. 0.5, 1.5, 1.09)</label>
+      <input class="input" id="hqInput" type="number" step="0.01" min="0.01" inputmode="decimal" placeholder="1.0"
+        style="margin:8px 0 12px" onkeydown="if(event.key==='Enter')confirmHalfQty()">
+      <div class="flex gap-2" style="margin-bottom:12px">
+        <button class="btn btn-ghost" style="flex:1" onclick="setHalfQtyVal(0.25)">¼</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="setHalfQtyVal(0.5)">½</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="setHalfQtyVal(0.75)">¾</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="setHalfQtyVal(1)">1</button>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="confirmHalfQty()">Add to Order</button>
+    </div>
+  </div>
+
   <!-- ══════════════════════════════════
      BARCODE SCANNER OVERLAY
      Uses BarcodeDetector API (Chrome/Android)

@@ -16,7 +16,7 @@ const OrderModel = {
       let subtotal = 0, tax_total = 0;
       const lineItems = items.map(item => {
         const tax_rate = parseFloat(item.tax_rate) || 0;
-        const pre_tax = parseFloat(item.price) * parseInt(item.quantity);
+        const pre_tax = parseFloat(item.price) * parseFloat(item.quantity);
         const tax_amt = +(pre_tax * (tax_rate / 100)).toFixed(2);
         const line_tot = +(pre_tax + tax_amt).toFixed(2);
         subtotal += pre_tax;
