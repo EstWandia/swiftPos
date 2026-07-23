@@ -137,7 +137,7 @@ function renderProducts(items) {
   grid.innerHTML = items.map(p => {
     const isFav = favorites.has(p.id);
     const effPrice = p.on_sale && p.sale_price ? parseFloat(p.sale_price) : parseFloat(p.price);
-    const outOfStock = p.track_stock && parseInt(p.stock_qty) <= 0;
+    const outOfStock = p.track_stock && parseFloat(p.stock_qty) <= 0;
 
     const priceHtml = p.on_sale && p.sale_price
       ? `<span class="pcard-price stk">${fmt(p.price)}</span><span class="pcard-sale">${fmt(p.sale_price)}</span>`
@@ -154,11 +154,11 @@ function renderProducts(items) {
     const stockBadge = p.track_stock
       ? (outOfStock
         ? ''  // already shown via oos badge
-        : `<span class="stock-count ${parseInt(p.stock_qty) <= 5 ? 'low' : ''}">📦 ${p.stock_qty} left</span>`)
+        : `<span class="stock-count ${parseFloat(p.stock_qty) <= 5 ? 'low' : ''}">📦 ${p.stock_qty} left</span>`)
       : '';
 
     // Small indicator for items sold in halves/fractions (shown alongside other badges)
-    const halfBadge = p.sold_by_half ? '<span class="badge" style="background:#fff;color:var(--t2)" title="Sold in halves/fractions">½ qty</span>' : '';
+    const halfBadge = p.sold_by_half ? '<span class="badge" style="background:var(--s3);color:var(--t2)" title="Sold in halves/fractions">½ qty</span>' : '';
 
     // Include stock info in payload so addToCart can check it
     const pStr = JSON.stringify({
@@ -338,7 +338,7 @@ function addToCart(product) {
   if (typeof product === 'string') product = JSON.parse(product);
 
   // Block if tracked and stock is zero
-  if (product.track_stock && parseInt(product.stock_qty) <= 0) {
+  if (product.track_stock && parseFloat(product.stock_qty) <= 0) {
     showToast(`❌ ${product.name} is out of stock`, 'error');
     return;
   }
@@ -597,7 +597,41 @@ function setPay(el) {
   el.classList.add('on');
   payMethod = el.dataset.method;
   document.getElementById('cashRow').classList.toggle('show', payMethod === 'cash');
+  document.getElementById('debtRow').classList.toggle('show', payMethod === 'debt');
+  const lbl = document.getElementById('chargeBtnLabel');
+  if (lbl) lbl.textContent = payMethod === 'debt' ? '🧾  Record Debt Sale' : '✓  Complete Order';
+  if (payMethod === 'debt') {
+    const nameIn = document.getElementById('debtCustNameIn');
+    if (nameIn && !nameIn.value && selectedCustomer) nameIn.value = selectedCustomer.name;
+    calcDebtRemaining();
+  }
   calcChange();
+}
+
+function calcDebtRemaining() {
+  const { grand } = calcTotals();
+  const paidNow = parseFloat(document.getElementById('debtPaidIn')?.value) || 0;
+  const custName = (document.getElementById('debtCustNameIn')?.value || '').trim();
+  const el = document.getElementById('debtRemainingDisplay');
+  if (!el) return;
+  const owed = Math.max(0, +(grand - paidNow).toFixed(2));
+
+  if (paidNow > grand) {
+    el.textContent = `⚠ Amount paid can't exceed total (${fmt(grand)})`;
+    el.style.color = 'var(--red)';
+  } else if (!custName) {
+    el.textContent = `⚠ Enter a customer name to track this debt`;
+    el.style.color = 'var(--red)';
+  } else if (owed === 0) {
+    el.textContent = `✓ Fully paid — will complete as a normal sale`;
+    el.style.color = 'var(--green)';
+  } else if (paidNow > 0) {
+    el.textContent = `🧾 ${custName} owes ${fmt(owed)} (${fmt(paidNow)} paid now)`;
+    el.style.color = 'var(--amber)';
+  } else {
+    el.textContent = `🧾 ${custName} owes the full amount: ${fmt(owed)}`;
+    el.style.color = 'var(--amber)';
+  }
 }
 
 function calcChange() {
@@ -615,11 +649,22 @@ function calcChange() {
 // ── Checkout ──────────────────────────────────────────
 async function checkout() {
   if (!cart.length) return;
+
+  // Debt sales must have a name attached so it can be tracked and collected
+  const debtCustName = payMethod === 'debt' ? (document.getElementById('debtCustNameIn').value || '').trim() : '';
+  if (payMethod === 'debt' && !debtCustName) {
+    showToast('❌ Please enter a customer name to track this debt', 'error');
+    document.getElementById('debtCustNameIn').focus();
+    calcDebtRemaining();
+    return;
+  }
+
   const btn = document.getElementById('chargeBtn');
   btn.disabled = true;
   document.getElementById('chargeBtnLabel').textContent = 'Processing…';
 
   const { grand } = calcTotals();
+  const debtPaidNow = payMethod === 'debt' ? (parseFloat(document.getElementById('debtPaidIn').value) || 0) : null;
 
   const payload = {
     items: cart.map(i => ({
@@ -636,17 +681,30 @@ async function checkout() {
     discount_type: discountType || null,
     discount_value: discountType === 'percent' ? discountPct : (discountType === 'fixed' ? discountAmt : 0),
     amount_tendered: payMethod === 'cash' ? (parseFloat(document.getElementById('tenderedIn').value) || null) : null,
+    amount_paid_now: debtPaidNow,
+    debt_customer_name: payMethod === 'debt' ? debtCustName : null,
   };
 
   try {
     const result = await API.post('/api/orders', payload);
 
-    // ✅ Success flash
+    // ✅ Success flash — different messaging for debt sales
     const flash = document.getElementById('successFlash');
+    const isDebt = result.status === 'debt';
+    document.getElementById('sfIcon').textContent = isDebt ? '🧾' : '✅';
+    document.getElementById('sfTitle').textContent = isDebt ? 'Sale Recorded — On Debt' : 'Payment Complete!';
     document.getElementById('sfOrderNum').textContent = result.order_number;
     document.getElementById('sfAmt').textContent = fmt(result.total);
-    if (result.change_amount > 0) {
+    if (isDebt) {
+      const who = result.debt_customer_name ? `${result.debt_customer_name} — ` : '';
+      document.getElementById('sfChange').textContent = parseFloat(result.amount_paid) > 0
+        ? `${who}${fmt(result.amount_paid)} paid now · ${fmt(result.debt_amount)} owing`
+        : `${who}owes the full amount: ${fmt(result.debt_amount)}`;
+      document.getElementById('sfChange').style.color = 'var(--amber)';
+      document.getElementById('sfChange').style.display = '';
+    } else if (result.change_amount > 0) {
       document.getElementById('sfChange').textContent = `Change: ${fmt(result.change_amount)}`;
+      document.getElementById('sfChange').style.color = 'var(--green)';
       document.getElementById('sfChange').style.display = '';
     } else {
       document.getElementById('sfChange').style.display = 'none';
@@ -668,8 +726,15 @@ async function checkout() {
       const tenderedIn = document.getElementById('tenderedIn');
       if (tenderedIn) tenderedIn.value = '';
 
-      const cashRow = document.getElementById('cashRow');
-      if (cashRow) cashRow.classList.remove('show');
+      const debtPaidIn = document.getElementById('debtPaidIn');
+      if (debtPaidIn) debtPaidIn.value = '';
+
+      const debtCustNameIn = document.getElementById('debtCustNameIn');
+      if (debtCustNameIn) debtCustNameIn.value = '';
+
+      // Reset payment method back to cash for the next order
+      const cashBtn = document.querySelector('.pay-opt[data-method="cash"]');
+      if (cashBtn) setPay(cashBtn);
 
       const custName = document.getElementById('custName');
       if (custName) custName.textContent = 'Walk-in Customer';
@@ -687,7 +752,7 @@ async function checkout() {
   } catch (e) {
     showToast(e.message, 'error');
     btn.disabled = false;
-    document.getElementById('chargeBtnLabel').textContent = '✓  Complete Order';
+    document.getElementById('chargeBtnLabel').textContent = payMethod === 'debt' ? '🧾  Record Debt Sale' : '✓  Complete Order';
   }
 }
 

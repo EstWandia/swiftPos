@@ -651,6 +651,8 @@
               <div class="am-item" onclick="openAnalytics('dead')"><span class="am-icon">📦</span> Dead Stock</div>
               <div class="am-item" onclick="openAnalytics('returned')"><span class="am-icon">↩️</span> Returned Items
               </div>
+              <div class="am-item" onclick="openAnalytics('debt')"><span class="am-icon">🧾</span> Debt Orders
+              </div>
             </div>
           </div>
         </div>
@@ -906,6 +908,35 @@
       <div class="mob-cards" id="returnedCards"></div>
     </div>
 
+    <!-- 5. Debt Orders -->
+    <div id="panelDebt" class="analytics-panel">
+      <div class="analytics-header">
+        <button class="back-btn" onclick="closeAnalytics()">← Back</button>
+        <div class="panel-title">🧾 Debt Orders</div>
+        <span id="debtRange" style="font-size:12px;color:var(--t2)"></span>
+      </div>
+      <div class="sg" id="debtStats" style="margin-bottom:14px"></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Order No.</th>
+              <th>Customer</th>
+              <th>Total</th>
+              <th>Paid</th>
+              <th>Owing</th>
+              <th>Cashier</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="debtTbl"></tbody>
+        </table>
+      </div>
+      <div class="mob-cards" id="debtCards"></div>
+    </div>
+
   </div><!-- end page-body -->
 
   <div class="statusbar">
@@ -1034,6 +1065,7 @@
       else if (type === 'moving') loadMoving();
       else if (type === 'dead') loadDead();
       else if (type === 'returned') loadReturned();
+      else if (type === 'debt') loadDebt();
     }
 
     function closeAnalytics() {
@@ -1337,6 +1369,71 @@
         await API.post(`/api/analytics/returned/${soldItemId}/confirm`);
         showToast('Item restocked', 'success');
         loadReturned();
+      } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function loadDebt() {
+      document.getElementById('panelDebt').classList.add('active');
+      document.getElementById('debtRange').textContent = rangeLabel();
+      document.getElementById('debtTbl').innerHTML = '<tr><td colspan="9"><div class="spinner"></div></td></tr>';
+      document.getElementById('debtCards').innerHTML = '';
+      document.getElementById('debtStats').innerHTML = '<div class="spinner"></div>';
+      try {
+        const { rows } = await API.get(`/api/analytics/debt-orders?date_from=${getDF()}&date_to=${getDT()}`);
+
+        const open = rows.filter(r => r.status === 'debt');
+        const openTotal = open.reduce((s, r) => s + parseFloat(r.debt_amount || 0), 0);
+        const settledCount = rows.length - open.length;
+        document.getElementById('debtStats').innerHTML = `
+      <div class="sc"><div class="sl">Open Debts</div><div class="sv a">${open.length}</div></div>
+      <div class="sc"><div class="sl">Total Owing</div><div class="sv" style="color:var(--amber)">${fmt(openTotal)}</div></div>
+      <div class="sc"><div class="sl">Settled (period)</div><div class="sv g">${settledCount}</div></div>`;
+
+        if (!rows.length) {
+          const empty = '<div class="empty-state" style="padding:20px"><p>No debt orders in this period</p></div>';
+          document.getElementById('debtTbl').innerHTML = `<tr><td colspan="9">${empty}</td></tr>`;
+          document.getElementById('debtCards').innerHTML = empty;
+          return;
+        }
+
+        document.getElementById('debtTbl').innerHTML = rows.map(r => `<tr>
+      <td class="mono" style="color:var(--a)">${r.order_number}</td>
+      <td>${r.customer_name || '<span style="color:var(--t3)">No customer</span>'}${r.customer_phone ? `<div style="font-size:10px;color:var(--t3)">${r.customer_phone}</div>` : ''}</td>
+      <td class="mono">${fmt(r.total)}</td>
+      <td class="mono" style="color:var(--green)">${fmt(r.amount_paid)}</td>
+      <td class="mono" style="color:var(--amber)">${fmt(r.debt_amount)}</td>
+      <td>${r.cashier_name}</td>
+      <td style="color:var(--t3);font-size:11px">${dateStr(r.created_at)}</td>
+      <td>${r.status === 'debt' ? '<span class="badge s-debt">Debt</span>' : '<span class="badge s-completed">Settled</span>'}</td>
+      <td>${r.status === 'debt'
+            ? `<button class="btn btn-primary" style="padding:4px 10px;font-size:11px" onclick="settleDebt(${r.id})">✔ Mark Paid</button>`
+            : ''}</td>
+</tr>`).join('');
+
+        document.getElementById('debtCards').innerHTML = rows.map(r => `<div class="m-card">
+      <div class="m-card-top">
+        <div class="m-card-name">🧾 ${r.order_number}</div>
+        <div class="m-card-val" style="color:var(--amber)">${fmt(r.debt_amount)}</div>
+      </div>
+      <div class="m-card-meta">
+        <span class="m-tag blue">${r.customer_name || 'No customer'}</span>
+        <span class="m-tag">Total ${fmt(r.total)}</span>
+        <span class="m-tag amber">${r.cashier_name}</span>
+      </div>
+      <div style="font-size:10px;color:var(--t3);margin-top:4px">${dateStr(r.created_at)}</div>
+      ${r.status === 'debt'
+            ? `<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="settleDebt(${r.id})">✔ Mark Paid</button>`
+            : `<span class="badge s-completed" style="margin-top:8px;display:inline-block">Settled</span>`}
+    </div>`).join('');
+      } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function settleDebt(orderId) {
+      if (!confirm('Mark this debt as fully paid? The amount will then count toward revenue.')) return;
+      try {
+        await API.post(`/api/analytics/debt-orders/${orderId}/settle`);
+        showToast('✅ Debt marked as paid', 'success');
+        loadDebt();
       } catch (e) { showToast(e.message, 'error'); }
     }
   </script>

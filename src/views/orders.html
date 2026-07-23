@@ -143,6 +143,12 @@
       border: 1px solid var(--border)
     }
 
+    .s-debt {
+      color: var(--amber);
+      background: rgba(255, 179, 71, .1);
+      border: 1px solid rgba(255, 179, 71, .25)
+    }
+
     .s-pending {
       color: var(--a);
       background: rgba(61, 139, 255, .1);
@@ -336,6 +342,7 @@
         <option value="hold">On Hold</option>
         <option value="cancelled">Cancelled</option>
         <option value="refunded">Refunded</option>
+        <option value="debt">Debt</option>
       </select>
       <span style="font-size:12px;color:var(--t2)">From</span>
       <input class="fi" type="date" id="fFrom" onchange="applyFilters()">
@@ -384,7 +391,7 @@
   <script>
     let page = 0, totalOrders = 0, currentUser = null;
     const LIMIT = 30;
-    const payIco = { cash: '💵', Mpesa: '💳' };
+    const payIco = { cash: '💵', Mpesa: '💳', debt: '🧾' };
 
     (async function () {
       try {
@@ -478,7 +485,7 @@
         document.getElementById('ddBody').innerHTML = `
       <div class="ds"><h4>Info</h4>
         <div class="info-grid">
-          <div class="ic"><div class="ic-l">Customer</div><div class="ic-v">${order.customer_name || 'Walk-in'}</div></div>
+          <div class="ic"><div class="ic-l">Customer</div><div class="ic-v">${order.customer_name || order.debt_customer_name || 'Walk-in'}</div></div>
           <div class="ic"><div class="ic-l">Payment</div><div class="ic-v">${payIco[order.payment_method] || ''} ${order.payment_method}</div></div>
           <div class="ic"><div class="ic-l">Status</div><div class="ic-v"><span class="badge s-${order.status}">${order.status}</span></div></div>
           <div class="ic"><div class="ic-l">Cashier</div><div class="ic-v">${order.cashier_name}</div></div>
@@ -501,9 +508,16 @@
           <div class="tl-row gt"><span class="l">Total</span><span class="v">${fmt(order.total)}</span></div>
           ${order.amount_tendered ? `<div class="tl-row"><span class="l">Given</span><span class="v mono">${fmt(order.amount_tendered)}</span></div>` : ''}
           ${order.change_amount != null && parseFloat(order.change_amount) >= 0 ? `<div class="tl-row"><span class="l">Change</span><span class="v mono" style="color:var(--green)">${fmt(order.change_amount)}</span></div>` : ''}
+          ${parseFloat(order.debt_amount) > 0 || order.status === 'debt' || order.debt_settled_at ? `
+          <div class="tl-row"><span class="l">Paid at sale</span><span class="v mono">${fmt(order.amount_paid)}</span></div>
+          ${order.status === 'debt'
+              ? `<div class="tl-row"><span class="l" style="color:var(--amber)">Debt owing</span><span class="v mono" style="color:var(--amber)">${fmt(order.debt_amount)}</span></div>`
+              : `<div class="tl-row"><span class="l" style="color:var(--green)">Debt settled${order.debt_settled_at ? ' · ' + fmtDateTime(order.debt_settled_at) : ''}</span><span class="v mono" style="color:var(--green)">✔</span></div>`}
+          ` : ''}
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${order.status === 'debt' && currentUser?.role !== 'cashier' ? `<button class="btn btn-primary" onclick="settleOrderDebt(${order.id})">🧾 Mark Debt Paid</button>` : ''}
         ${order.status === 'cancelled' || order.status === 'completed' ? `<button class="btn btn-ghost" onclick="updStatus(${order.id},'refunded')">Mark Returned</button>` : ''}
         <button class="btn btn-ghost ml-auto" onclick="closeDetail()">Close</button>
         </div>`;
@@ -524,6 +538,15 @@
       if (!confirm(`Mark order as "${status}"?`)) return;
       try { await API.put(`/api/orders/${id}/status`, { status }); showToast('Order updated', 'success'); closeDetail(); loadOrders(); }
       catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function settleOrderDebt(id) {
+      if (!confirm('Mark this debt as fully paid? The amount will then count toward revenue.')) return;
+      try {
+        await API.post(`/api/analytics/debt-orders/${id}/settle`);
+        showToast('✅ Debt marked as paid', 'success');
+        closeDetail(); loadOrders();
+      } catch (e) { showToast(e.message, 'error'); }
     }
 
     function closeDetail() { document.getElementById('detOv').classList.remove('open'); document.getElementById('detDr').classList.remove('open'); }

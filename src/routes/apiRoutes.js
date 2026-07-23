@@ -400,6 +400,50 @@ router.post('/analytics/returned/:soldItemId/confirm', requireAdmin, async (req,
 });
 
 
+// ── Debt Orders ──────────────────────────────────────────────────────
+// Lists open debts (status='debt') plus recently-settled ones for the
+// same date range, so admins can see the trail of what got cleared.
+router.get('/analytics/debt-orders', requireAdmin, async (req, res) => {
+  try {
+    const { date_from, date_to } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+    const df = date_from || today.slice(0, 8) + '01';
+    const dt = date_to || today;
+    const rows = await query(`
+      SELECT o.id, o.order_number, o.total, o.amount_paid, o.debt_amount, o.status,
+             o.created_at, o.debt_settled_at, o.debt_customer_name,
+             u.name AS cashier_name,
+             su.name AS settled_by_name,
+             COALESCE(c.name, o.debt_customer_name) AS customer_name,
+             c.phone AS customer_phone
+      FROM orders o
+      JOIN users u ON u.id = o.cashier_id
+      LEFT JOIN users su ON su.id = o.debt_settled_by
+      LEFT JOIN customers c ON c.id = o.customer_id
+      WHERE o.business_id = ?
+        AND (o.status = 'debt' OR o.debt_settled_at IS NOT NULL)
+        AND DATE(o.created_at) BETWEEN ? AND ?
+      ORDER BY (o.status = 'debt') DESC, o.created_at DESC
+    `, [bid(req), df, dt]);
+    res.json({ rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Mark a debt order as fully paid — only then does its total count toward revenue.
+router.post('/analytics/debt-orders/:id/settle', requireAdmin, async (req, res) => {
+  try {
+    const order = await queryOne('SELECT * FROM orders WHERE id=? AND business_id=?', [req.params.id, bid(req)]);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status !== 'debt') return res.status(400).json({ error: 'This order has no open debt' });
+    await run(
+      `UPDATE orders SET status='completed', amount_paid=total, debt_amount=0,
+         debt_settled_at=NOW(), debt_settled_by=?, updated_at=NOW() WHERE id=?`,
+      [req.session.user.id, order.id]
+    );
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.get('/items', ItemCtrl.getItems);
 router.get('/items/sku/:sku', ItemCtrl.getBySku);
 router.get('/items/:id', ItemCtrl.getItem);

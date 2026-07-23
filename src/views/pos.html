@@ -106,8 +106,8 @@
 
     <!-- SUCCESS FLASH -->
     <div class="success-flash" id="successFlash">
-      <div class="sf-ico">✅</div>
-      <div class="sf-title">Payment Complete!</div>
+      <div class="sf-ico" id="sfIcon">✅</div>
+      <div class="sf-title" id="sfTitle">Payment Complete!</div>
       <div class="sf-num" id="sfOrderNum"></div>
       <div class="sf-amt" id="sfAmt">€0.00</div>
       <div class="sf-chg" id="sfChange" style="display:none"></div>
@@ -175,6 +175,7 @@
       <div class="pay-row">
         <button class="pay-opt on" data-method="cash" onclick="setPay(this)"><span class="pi">💵</span>Cash</button>
         <button class="pay-opt" data-method="card" onclick="setPay(this)"><span class="pi">💳</span>Mpesa</button>
+        <button class="pay-opt" data-method="debt" onclick="setPay(this)"><span class="pi">🧾</span>Debt</button>
         <!-- <button class="pay-opt"    data-method="qr"   onclick="setPay(this)"><span class="pi">📱</span>QR Pay</button> -->
       </div>
       <!-- Cash tendered -->
@@ -182,6 +183,15 @@
         <input class="input" id="tenderedIn" type="number" placeholder="Amount Given" step="0.01" min="0"
           oninput="calcChange()">
         <div class="change-display" id="changeDisplay"></div>
+      </div>
+      <!-- Debt: optional partial payment now, rest tracked as debt -->
+      <div class="cash-row" id="debtRow" style="flex-direction:column;align-items:stretch;gap:6px">
+        <input class="input" id="debtPaidIn" type="number"
+          placeholder="Amount paid now (optional, leave blank if fully on debt)" step="0.01" min="0"
+          oninput="calcDebtRemaining()">
+        <input class="input" id="debtCustNameIn" type="text" placeholder="Customer name (who owes this debt)"
+          oninput="calcDebtRemaining()">
+        <div class="change-display" id="debtRemainingDisplay"></div>
       </div>
       <!-- Charge button -->
       <button class="charge-btn" id="chargeBtn" onclick="checkout()" disabled>

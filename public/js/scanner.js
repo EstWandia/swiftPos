@@ -229,7 +229,7 @@ async function handleScanResult(code) {
     const { item } = await API.get(`/api/items/sku/${encodeURIComponent(code)}`);
 
     // Check out of stock
-    if (item.track_stock && parseInt(item.stock_qty) <= 0) {
+    if (item.track_stock && parseFloat(item.stock_qty) <= 0) {
       showToast(`❌ ${item.name} is out of stock`, 'error');
       setStatus('Out of stock: ' + item.name);
       setTimeout(() => {

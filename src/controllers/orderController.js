@@ -8,10 +8,14 @@ const bid = req => req.session.user.business_id;
 const OrderController = {
   async createOrder(req, res) {
     const { items, payment_method, customer_id, discount_code,
-      discount_type, discount_value, amount_tendered, notes } = req.body;
+      discount_type, discount_value, amount_tendered, amount_paid_now,
+      debt_customer_name, notes } = req.body;
 
     if (!items || !items.length)
       return res.status(400).json({ error: 'No items in order' });
+
+    if (payment_method === 'debt' && !(debt_customer_name || '').trim())
+      return res.status(400).json({ error: 'Please enter a customer name to track this debt' });
 
     try {
       // Server-side stock check — never trust the cart totals sent from the client.
@@ -55,6 +59,8 @@ const OrderController = {
         discount_value: dv,
         discount_code: dc,
         amount_tendered: amount_tendered ? parseFloat(amount_tendered) : null,
+        amount_paid_now: amount_paid_now != null ? parseFloat(amount_paid_now) : null,
+        debt_customer_name: debt_customer_name ? debt_customer_name.trim() : null,
         notes
       });
 

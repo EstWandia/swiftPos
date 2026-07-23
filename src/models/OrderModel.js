@@ -10,7 +10,8 @@ function genOrderNum(businessId) {
 const OrderModel = {
   async create({ business_id, cashier_id, customer_id = null, items,
     payment_method = 'cash', discount_type = null, discount_value = 0,
-    discount_code = null, amount_tendered = null, notes = null }) {
+    discount_code = null, amount_tendered = null, amount_paid_now = null,
+    debt_customer_name = null, notes = null }) {
     return transaction(async ({ q, one }) => {
       // ── Calc totals ─────────────────────────────────────────────────────
       let subtotal = 0, tax_total = 0;
@@ -34,15 +35,27 @@ const OrderModel = {
       const change_amt = amount_tendered != null ? +(parseFloat(amount_tendered) - total).toFixed(2) : null;
       const order_number = genOrderNum(business_id);
 
+      // ── Debt sale handling ────────────────────────────────────────────
+      // A "debt" sale can be fully unpaid (amount_paid_now omitted/0) or
+      // partially paid now with the remainder tracked as debt. Whatever is
+      // still owed is excluded from revenue until an admin settles it.
+      const isDebtSale = payment_method === 'debt';
+      const amount_paid = isDebtSale
+        ? Math.max(0, Math.min(parseFloat(amount_paid_now) || 0, total))
+        : total;
+      const debt_amount = isDebtSale ? +(total - amount_paid).toFixed(2) : 0;
+      const status = (isDebtSale && debt_amount > 0) ? 'debt' : 'completed';
+
       // ── Insert order ────────────────────────────────────────────────────
       const orderRes = await q(
         `INSERT INTO orders (business_id,order_number,customer_id,cashier_id,status,payment_method,
            subtotal,tax_total,discount_type,discount_value,discount_amount,discount_code,
-           total,amount_tendered,change_amount,notes)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [business_id, order_number, customer_id, cashier_id, 'completed', payment_method,
+           total,amount_tendered,change_amount,amount_paid,debt_amount,debt_customer_name,notes)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [business_id, order_number, customer_id, cashier_id, status, payment_method,
           subtotal, tax_total, discount_type || null, discount_value || 0, disc_amt, discount_code || null,
-          total, amount_tendered || null, change_amt, notes || null]
+          total, amount_tendered || null, change_amt, amount_paid, debt_amount,
+          isDebtSale ? (debt_customer_name || null) : null, notes || null]
       );
       const order_id = orderRes.insertId;
 
@@ -80,7 +93,7 @@ const OrderModel = {
           [total, Math.floor(total), customer_id, business_id]);
       }
 
-      return { order_id, order_number, total, subtotal, tax_total, discount_amount: disc_amt, change_amount: change_amt };
+      return { order_id, order_number, total, subtotal, tax_total, discount_amount: disc_amt, change_amount: change_amt, status, amount_paid, debt_amount, debt_customer_name: isDebtSale ? debt_customer_name : null };
     });
   },
 
@@ -118,7 +131,8 @@ const OrderModel = {
       `SELECT o.id, o.business_id, o.order_number, o.customer_id, o.cashier_id,
               o.status, o.payment_method, o.subtotal, o.tax_total,
               o.discount_type, o.discount_value, o.discount_amount, o.discount_code,
-              o.total, o.amount_tendered, o.change_amount, o.notes,
+              o.total, o.amount_tendered, o.change_amount, o.amount_paid, o.debt_amount,
+              o.debt_customer_name, o.notes,
               o.receipt_printed, o.created_at, o.updated_at,
               u.name AS cashier_name,
               c.name AS customer_name,
@@ -131,7 +145,8 @@ const OrderModel = {
        GROUP BY o.id, o.business_id, o.order_number, o.customer_id, o.cashier_id,
                 o.status, o.payment_method, o.subtotal, o.tax_total,
                 o.discount_type, o.discount_value, o.discount_amount, o.discount_code,
-                o.total, o.amount_tendered, o.change_amount, o.notes,
+                o.total, o.amount_tendered, o.change_amount, o.amount_paid, o.debt_amount,
+                o.debt_customer_name, o.notes,
                 o.receipt_printed, o.created_at, o.updated_at,
                 u.name, c.name
        ORDER BY o.created_at DESC LIMIT ? OFFSET ?`,
