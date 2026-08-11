@@ -1114,13 +1114,15 @@
         document.getElementById('dailyTbl').innerHTML = rows.map(r => {
           const net = parseFloat(r.net_profit || 0);
           const exp = parseFloat(r.total_expenditure || 0);
+          const adhoc = parseFloat(r.adhoc_expenditure || 0);
           const netCls = net > 0 ? 'net-pos' : net < 0 ? 'net-neg' : 'net-zero';
+          const expTip = exp > 0 ? ` title="Expenditure: ${fmt(exp)} (Fixed: ${fmt(r.fixed_expenditure || 0)} + Logged: ${fmt(adhoc)})"` : '';
           return `<tr>
         <td><strong>${cleanDate(r.sale_date)}</strong></td>
         <td style="color:var(--t2)">${r.sale_day}</td>
         <td class="mono" style="color:var(--green)">${fmt(r.total_sale)}</td>
         <td class="mono" style="color:var(--a)">${fmt(r.gross_profit)}</td>
-        <td class="mono ${netCls}">${fmt(net)}</td>
+        <td class="mono ${netCls}"${expTip}>${fmt(net)}</td>
         <td class="mono">${r.quantity}</td>
       </tr>`;
         }).join('');
@@ -1128,6 +1130,7 @@
         document.getElementById('dailyCards').innerHTML = rows.map(r => {
           const net = parseFloat(r.net_profit || 0);
           const exp = parseFloat(r.total_expenditure || 0);
+          const adhoc = parseFloat(r.adhoc_expenditure || 0);
           const netCls = net > 0 ? 'blue' : net < 0 ? 'red' : '';
           return `<div class="m-card">
         <div class="m-card-top">
@@ -1138,6 +1141,7 @@
           <span class="m-tag blue">Gross: ${fmt(r.gross_profit)}</span>
           <span class="m-tag ${netCls}">Net: ${fmt(net)}</span>
           <span class="m-tag">${r.quantity} sold</span>
+          ${adhoc > 0 ? `<span class="m-tag amber">Logged exp: ${fmt(adhoc)}</span>` : ''}
         </div>
       </div>`;
         }).join('');

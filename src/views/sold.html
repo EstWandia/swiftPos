@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>SwiftPOS — Sold Items</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        html {
+            height: 100%;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .page-body {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 16px 16px 80px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .sum-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px
+        }
+
+        .sc {
+            background: var(--s2);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            padding: 4px 8px
+        }
+
+        .sc-lbl {
+            font-size: 10px;
+            color: var(--t2);
+            text-transform: uppercase;
+            letter-spacing: .6px;
+            margin-bottom: 6px
+        }
+
+        .sc-val {
+            font-size: 22px;
+            font-weight: 800;
+            font-family: var(--mono)
+        }
+
+        .sc-val.g {
+            color: var(--green)
+        }
+
+        .sc-val.b {
+            color: var(--a)
+        }
+
+        .filters {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+            align-items: center
+        }
+
+        .fi {
+            background: var(--s2);
+            border: 1px solid var(--border);
+            border-radius: var(--rs);
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 12px;
+            padding: 7px 10px;
+            outline: none
+        }
+
+        .fi:focus {
+            border-color: var(--a)
+        }
+
+        .qr-btn {
+            background: var(--s2);
+            border: 1px solid var(--border);
+            border-radius: var(--rs);
+            color: var(--t2);
+            font-family: var(--font);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 7px 12px;
+            cursor: pointer;
+            transition: all .15s
+        }
+
+        .qr-btn:hover {
+            border-color: var(--a);
+            color: var(--text)
+        }
+
+        .qr-btn.on {
+            background: var(--a);
+            border-color: var(--a);
+            color: #fff
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 720px
+        }
+
+        th {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--t3);
+            text-transform: uppercase;
+            letter-spacing: .7px;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+            white-space: nowrap
+        }
+
+        td {
+            font-size: 13px;
+            padding: 11px 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle
+        }
+
+        tr:hover td {
+            background: var(--s2)
+        }
+
+        .s-normal {
+            color: var(--green);
+            background: rgba(31, 209, 133, .1);
+            border: 1px solid rgba(31, 209, 133, .25)
+        }
+
+        .s-return-pending {
+            color: var(--amber);
+            background: rgba(255, 179, 71, .1);
+            border: 1px solid rgba(255, 179, 71, .25)
+        }
+
+        .s-returned {
+            color: var(--t2);
+            background: var(--s3);
+            border: 1px solid var(--border)
+        }
+
+        .pg {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 16px;
+            padding: 10px 0
+        }
+
+        /* Mobile cards */
+        .mob-cards {
+            display: none
+        }
+
+        .m-card {
+            background: var(--s2);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            padding: 12px;
+            margin-bottom: 8px
+        }
+
+        .m-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px
+        }
+
+        .m-card-name {
+            font-size: 13px;
+            font-weight: 700
+        }
+
+        .m-card-val {
+            font-size: 15px;
+            font-weight: 800;
+            font-family: var(--mono);
+            color: var(--a);
+            flex-shrink: 0
+        }
+
+        .m-card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px
+        }
+
+        .m-tag {
+            font-size: 10px;
+            padding: 2px 7px;
+            border-radius: 20px;
+            background: var(--s3);
+            color: var(--t2)
+        }
+
+        .m-tag.blue {
+            background: rgba(61, 139, 255, .12);
+            color: var(--a)
+        }
+
+        .m-tag.amber {
+            background: rgba(255, 179, 71, .12);
+            color: var(--amber)
+        }
+
+        @media (max-width:760px) {
+            .tbl-wrap {
+                display: none
+            }
+
+            .mob-cards {
+                display: block
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <span class="logo" id="bizName">⚡ SwiftPOS</span>
+        <nav class="nav-links" id="navLinks"></nav>
+        <div class="topbar-right">
+            <div class="avatar" id="userAvatar" onclick="window.location='/auth/logout'" title="Sign out"></div>
+        </div>
+    </header>
+
+    <div class="page-body">
+        <h2 style="font-size:18px;margin-bottom:14px">🧾 Sold Items</h2>
+
+        <div class="sum-grid">
+            <div class="sc">
+                <div class="sc-lbl">Items Sold</div>
+                <div class="sc-val b" id="sumQty">—</div>
+            </div>
+            <div class="sc">
+                <div class="sc-lbl">Revenue</div>
+                <div class="sc-val g" id="sumRev">—</div>
+            </div>
+            <div class="sc">
+                <div class="sc-lbl">Sale Lines</div>
+                <div class="sc-val" id="sumLines">—</div>
+            </div>
+            <div class="sc">
+                <div class="sc-lbl">Unique Products</div>
+                <div class="sc-val" id="sumUnique">—</div>
+            </div>
+        </div>
+
+        <div class="filters">
+            <button class="qr-btn on" id="qrToday" onclick="setQuickRange('today')">Today</button>
+            <button class="qr-btn" id="qrWeek" onclick="setQuickRange('week')">This Week</button>
+            <button class="qr-btn" id="qrMonth" onclick="setQuickRange('month')">This Month</button>
+            <span style="font-size:12px;color:var(--t2)">From</span>
+            <input class="fi" type="date" id="fFrom" onchange="onDateChange()">
+            <span style="font-size:12px;color:var(--t2)">To</span>
+            <input class="fi" type="date" id="fTo" onchange="onDateChange()">
+            <input class="fi" type="text" id="fSearch" placeholder="Search item…" oninput="debouncedFilter()"
+                style="min-width:140px">
+            <button class="btn btn-ghost" onclick="clearFilters()">Clear</button>
+        </div>
+
+        <div class="tbl-wrap" style="overflow-x:auto;min-width:0">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Item</th>
+                        <th>SKU</th>
+                        <th>Qty</th>
+                        <th>Unit Price</th>
+                        <th>Line Total</th>
+                        <th>Order No.</th>
+                        <th>Cashier</th>
+                        <th>Sold At</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="soldBody"></tbody>
+            </table>
+        </div>
+        <div class="mob-cards" id="soldCards"></div>
+        <div class="pg" id="pg"></div>
+    </div>
+
+    <div class="statusbar"><span><span class="dot"></span>Online</span><span id="clock" class="mono ml-auto"></span>
+    </div>
+
+    <div id="toast"></div>
+    <script src="/js/api.js"></script>
+    <script>
+        let page = 0, totalRows = 0, currentUser = null, lastRows = [];
+        const LIMIT = 50;
+        const stateBadge = { 0: ['Normal', 's-normal'], 1: ['Return Pending', 's-return-pending'], 2: ['Returned', 's-returned'] };
+
+        (async function () {
+            try {
+                const { user } = await API.get('/api/me'); currentUser = user;
+                document.getElementById('userAvatar').textContent = user.name.slice(0, 2).toUpperCase();
+                document.getElementById('bizName').textContent = user.business?.name || 'SwiftPOS';
+                window._currSym = user.business?.currency_sym || '€';
+                buildNav(user.role, '/sold');
+            } catch { window.location.href = '/login'; return; }
+            startClock('clock');
+
+            // Default range: today
+            const t = todayStr();
+            document.getElementById('fFrom').value = t;
+            document.getElementById('fTo').value = t;
+
+            await loadSold();
+        })();
+
+        function todayStr() {
+            const d = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        }
+
+        function setQuickRange(range) {
+            document.querySelectorAll('.qr-btn').forEach(b => b.classList.remove('on'));
+            const now = new Date();
+            let from, to = todayStr();
+
+            if (range === 'today') {
+                document.getElementById('qrToday').classList.add('on');
+                from = todayStr();
+            } else if (range === 'week') {
+                document.getElementById('qrWeek').classList.add('on');
+                const day = now.getDay() === 0 ? 6 : now.getDay() - 1; // Monday-start week
+                const monday = new Date(now); monday.setDate(now.getDate() - day);
+                const pad = n => String(n).padStart(2, '0');
+                from = `${monday.getFullYear()}-${pad(monday.getMonth() + 1)}-${pad(monday.getDate())}`;
+            } else if (range === 'month') {
+                document.getElementById('qrMonth').classList.add('on');
+                from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+            }
+
+            document.getElementById('fFrom').value = from;
+            document.getElementById('fTo').value = to;
+            page = 0; loadSold();
+        }
+
+        function onDateChange() {
+            // Manually editing dates deselects the quick-range buttons
+            document.querySelectorAll('.qr-btn').forEach(b => b.classList.remove('on'));
+            page = 0; loadSold();
+        }
+
+        let _dt;
+        function debouncedFilter() { clearTimeout(_dt); _dt = setTimeout(() => { page = 0; loadSold(); }, 300); }
+
+        function clearFilters() {
+            document.getElementById('fSearch').value = '';
+            setQuickRange('today');
+        }
+
+        async function loadSummary(df, dt) {
+            try {
+                const { summary } = await API.get(`/api/sold-items/summary?date_from=${df}&date_to=${dt}`);
+                document.getElementById('sumQty').textContent = parseFloat(summary.total_qty || 0);
+                document.getElementById('sumRev').textContent = fmt(summary.total_revenue || 0);
+                document.getElementById('sumLines').textContent = summary.line_count || 0;
+                document.getElementById('sumUnique').textContent = summary.unique_items || 0;
+            } catch (_) { }
+        }
+
+        async function loadSold() {
+            const df = document.getElementById('fFrom').value || todayStr();
+            const dt = document.getElementById('fTo').value || todayStr();
+            const search = document.getElementById('fSearch').value.trim();
+
+            let url = `/api/sold-items?limit=${LIMIT}&offset=${page * LIMIT}&date_from=${df}&date_to=${dt}`;
+
+            document.getElementById('soldBody').innerHTML = '<tr><td colspan="11"><div class="spinner"></div></td></tr>';
+            document.getElementById('soldCards').innerHTML = '';
+
+            try {
+                let { rows, total } = await API.get(url);
+                if (search) {
+                    const s = search.toLowerCase();
+                    rows = rows.filter(r => r.item_name.toLowerCase().includes(s) || (r.item_sku || '').toLowerCase().includes(s));
+                }
+                totalRows = total;
+                renderTable(rows);
+                renderPg();
+                loadSummary(df, dt);
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        function renderTable(rows) {
+            lastRows = rows;
+            if (!rows.length) {
+                const empty = '<div class="empty-state"><div class="ei">🧾</div><h3>No sold items found</h3><p>Try a different date range</p></div>';
+                document.getElementById('soldBody').innerHTML = `<tr><td colspan="11">${empty}</td></tr>`;
+                document.getElementById('soldCards').innerHTML = empty;
+                return;
+            }
+
+            document.getElementById('soldBody').innerHTML = rows.map((r, i) => {
+                const [label, cls] = stateBadge[r.state] || stateBadge[0];
+                return `<tr>
+        <td style="color:var(--t3)">${page * LIMIT + i + 1}</td>
+        <td><strong>${r.item_name}</strong>${r.category_name ? `<div style="font-size:11px;color:var(--t3)">${r.category_name}</div>` : ''}</td>
+        <td class="mono" style="color:var(--t2);font-size:12px">${r.item_sku}</td>
+        <td class="mono">${parseFloat(r.quantity)}</td>
+        <td class="mono">${fmt(r.unit_price)}</td>
+        <td class="mono"><strong>${fmt(r.line_total)}</strong></td>
+        <td class="mono" style="color:var(--a);font-size:12px">${r.order_number}</td>
+        <td style="font-size:12px">${r.cashier_name}</td>
+        <td style="color:var(--t2);white-space:nowrap;font-size:12px">${fmtDateTime(r.sold_at)}</td>
+        <td><span class="badge ${cls}">${label}</span></td>
+        <td>${r.state === 0 ? `<button class="btn btn-ghost" style="padding:4px 8px;font-size:11px" title="Return this item" onclick="returnSoldItem(${r.id})">↩</button>` : ''}</td>
+      </tr>`;
+            }).join('');
+
+            document.getElementById('soldCards').innerHTML = rows.map(r => {
+                const [label, cls] = stateBadge[r.state] || stateBadge[0];
+                return `<div class="m-card">
+        <div class="m-card-top">
+          <div class="m-card-name">${r.item_name}</div>
+          <div class="m-card-val">${fmt(r.line_total)}</div>
+        </div>
+        <div class="m-card-meta">
+          <span class="m-tag blue">×${parseFloat(r.quantity)} @ ${fmt(r.unit_price)}</span>
+          <span class="m-tag">${r.order_number}</span>
+          <span class="m-tag amber">${r.cashier_name}</span>
+          <span class="badge ${cls}">${label}</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+          <div style="font-size:10px;color:var(--t3)">${fmtDateTime(r.sold_at)}</div>
+          ${r.state === 0 ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="returnSoldItem(${r.id})">↩ Return</button>` : ''}
+        </div>
+      </div>`;
+            }).join('');
+        }
+
+        async function returnSoldItem(soldItemId) {
+            const r = lastRows.find(x => x.id === soldItemId);
+            if (!r) return;
+            const maxQty = parseFloat(r.quantity);
+            const qtyStr = prompt(`Return how many "${r.item_name}"? (max ${maxQty})`, String(maxQty));
+            if (qtyStr === null) return;
+            const qty = parseFloat(qtyStr);
+            if (!qty || qty <= 0 || qty > maxQty) { showToast('❌ Invalid quantity', 'error'); return; }
+            const reason = prompt('Reason for return (optional):') || null;
+            try {
+                await API.post(`/api/orders/${r.order_id}/items/${r.item_id}/return`, { quantity: qty, reason });
+                showToast('↩ Return requested — an admin will confirm it to restock', 'success');
+                loadSold();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        function renderPg() {
+            const pages = Math.ceil(totalRows / LIMIT);
+            if (pages <= 1) { document.getElementById('pg').innerHTML = ''; return; }
+            let h = '';
+            if (page > 0) h += `<button class="btn btn-ghost" onclick="goPage(${page - 1})">← Prev</button>`;
+            h += `<span style="font-size:12px;color:var(--t2)">Page ${page + 1} of ${pages} &nbsp;·&nbsp; ${totalRows} items</span>`;
+            if (page < pages - 1) h += `<button class="btn btn-ghost" onclick="goPage(${page + 1})">Next →</button>`;
+            document.getElementById('pg').innerHTML = h;
+        }
+
+        function goPage(p) { page = p; loadSold(); }
+    </script>
+</body>
+
+</html>

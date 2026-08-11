@@ -4,6 +4,7 @@ const ItemCtrl = require('../controllers/itemController');
 const OrderCtrl = require('../controllers/orderController');
 const CustomerModel = require('../models/CustomerModel');
 const SoldItemModel = require('../models/SoldItemModel');
+const ExpenditureModel = require('../models/ExpenditureModel');
 const { requireAdmin, requireSuperAdmin } = require('../middlewares/authMiddleware');
 const { query, queryOne, run } = require('../config/database');
 
@@ -95,6 +96,9 @@ router.get('/analytics/daily', requireAdmin, async (req, res) => {
     );
     const fixedDaily = parseFloat(expRow?.fixed_daily || 0);
 
+    // Ad-hoc expenditures cashiers logged for specific days in this range
+    const adhocRows = await ExpenditureModel.getDailyTotals(bid(req), { date_from: df, date_to: dt });
+
     const rows = await query(`
       SELECT
         DATE(si.sold_at)                                                AS sale_date,
@@ -126,6 +130,12 @@ router.get('/analytics/daily', requireAdmin, async (req, res) => {
       dateMap.set(key, r);
     });
 
+    const adhocMap = new Map();
+    adhocRows.forEach(r => {
+      const key = r.expense_date instanceof Date ? fmtDate(r.expense_date) : String(r.expense_date).slice(0, 10);
+      adhocMap.set(key, parseFloat(r.total) || 0);
+    });
+
     // ── Walk every calendar day in the range, filling gaps with zero-sale rows ──
     const result = [];
     const cursor = parseYMD(df);
@@ -138,6 +148,8 @@ router.get('/analytics/daily', requireAdmin, async (req, res) => {
       const totalSale = existing ? parseFloat(existing.total_sale) || 0 : 0;
       const grossProfit = existing ? parseFloat(existing.gross_profit) || 0 : 0;
       const quantity = existing ? parseInt(existing.quantity) || 0 : 0;
+      const adhocExpenditure = adhocMap.get(key) || 0;
+      const totalExpenditure = +(fixedDaily + adhocExpenditure).toFixed(2);
 
       result.push({
         sale_date: key,
@@ -145,8 +157,10 @@ router.get('/analytics/daily', requireAdmin, async (req, res) => {
         total_sale: totalSale,
         gross_profit: grossProfit,
         quantity: quantity,
-        total_expenditure: fixedDaily,
-        net_profit: +((grossProfit) - fixedDaily).toFixed(2)
+        fixed_expenditure: fixedDaily,
+        adhoc_expenditure: +adhocExpenditure.toFixed(2),
+        total_expenditure: totalExpenditure,
+        net_profit: +(grossProfit - totalExpenditure).toFixed(2)
       });
 
       cursor.setDate(cursor.getDate() + 1);
@@ -315,11 +329,13 @@ router.get('/analytics/dead-stock', requireAdmin, async (req, res) => {
 
 // ── Partial Returns ──────────────────────────────────────────────────
 
-// Mark a quantity of one order line as "return requested"
-router.post('/orders/:orderId/items/:itemId/return', requireAdmin, async (req, res) => {
+// Mark a quantity of one order line as "return requested" — any logged-in
+// staff (including cashiers) can flag a return; only an admin/manager can
+// confirm it below, which is the point where stock actually gets restocked.
+router.post('/orders/:orderId/items/:itemId/return', async (req, res) => {
   try {
     const { quantity, reason = null } = req.body;
-    const qty = parseInt(quantity);
+    const qty = parseFloat(quantity);
     if (!qty || qty <= 0) return res.status(400).json({ error: 'Quantity must be greater than 0' });
 
     const soldItem = await queryOne(
@@ -327,9 +343,9 @@ router.post('/orders/:orderId/items/:itemId/return', requireAdmin, async (req, r
       [req.params.orderId, req.params.itemId, bid(req)]
     );
     if (!soldItem) return res.status(404).json({ error: 'Sold item not found or already returned' });
-    if (qty > soldItem.quantity) return res.status(400).json({ error: `Cannot return more than ${soldItem.quantity} sold` });
+    if (qty > parseFloat(soldItem.quantity)) return res.status(400).json({ error: `Cannot return more than ${soldItem.quantity} sold` });
 
-    if (qty === soldItem.quantity) {
+    if (qty === parseFloat(soldItem.quantity)) {
       // whole line returned
       await run(
         `UPDATE sold_items
@@ -339,7 +355,7 @@ router.post('/orders/:orderId/items/:itemId/return', requireAdmin, async (req, r
       );
     } else {
       // partial: shrink original sold row, split off a new "return requested" row
-      const remaining = soldItem.quantity - qty;
+      const remaining = +(parseFloat(soldItem.quantity) - qty).toFixed(2);
       await run(
         `UPDATE sold_items SET quantity=?, line_total=? WHERE id=?`,
         [remaining, (soldItem.unit_price * remaining).toFixed(2), soldItem.id]
@@ -480,14 +496,79 @@ router.post('/customers', async (req, res) => {
 // ── Sold items ─────────────────────────────────────────────────────────
 router.get('/sold-items', async (req, res) => {
   try {
-    const { date_from, date_to, limit, offset } = req.query;
-    res.json(await SoldItemModel.getAll(bid(req), { date_from, date_to, limit, offset }));
+    const { date_from, date_to, limit, offset, cashier_id, item_id } = req.query;
+    // Cashiers only ever see their own sold items; admins/managers can see
+    // everyone's, or filter down to one cashier via ?cashier_id=
+    const scopedCashierId = req.session.user.role === 'cashier'
+      ? req.session.user.id
+      : (cashier_id ? parseInt(cashier_id) : null);
+    res.json(await SoldItemModel.getAll(bid(req), { date_from, date_to, limit, offset, cashier_id: scopedCashierId, item_id }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.get('/sold-items/daily', async (req, res) => {
   try {
     res.json({ items: await SoldItemModel.getDailyBreakdown(bid(req), req.query.date) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/sold-items/summary', async (req, res) => {
+  try {
+    const { date_from, date_to, cashier_id } = req.query;
+    const scopedCashierId = req.session.user.role === 'cashier'
+      ? req.session.user.id
+      : (cashier_id ? parseInt(cashier_id) : null);
+    const summary = await SoldItemModel.getSummary(bid(req), { cashier_id: scopedCashierId, date_from, date_to });
+    res.json({ summary });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Ad-hoc Expenditures (cashier-logged, day-specific) ──────────────────
+// Distinct from recurring_expenditures (fixed costs applied every day).
+// These reduce that specific day's profit in the daily analytics report.
+router.get('/expenditures', async (req, res) => {
+  try {
+    const { date_from, date_to, cashier_id, limit, offset } = req.query;
+    const scopedCashierId = req.session.user.role === 'cashier'
+      ? req.session.user.id
+      : (cashier_id ? parseInt(cashier_id) : null);
+    const result = await ExpenditureModel.getAll(bid(req), { cashier_id: scopedCashierId, date_from, date_to, limit, offset });
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/expenditures', async (req, res) => {
+  try {
+    const { amount, description, expense_date } = req.body;
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) return res.status(400).json({ error: 'Enter a valid amount' });
+    if (!description || !description.trim()) return res.status(400).json({ error: 'Enter a description' });
+
+    // Trust a client-supplied date (YYYY-MM-DD) since it reflects the
+    // cashier's own local calendar day, which is what "today" should mean
+    // here — safer than relying on the server's timezone configuration.
+    const validDate = /^\d{4}-\d{2}-\d{2}$/.test(expense_date || '') ? expense_date : null;
+
+    const row = await ExpenditureModel.create({
+      business_id: bid(req),
+      cashier_id: req.session.user.id,
+      amount: amt,
+      description: description.trim(),
+      expense_date: validDate
+    });
+    res.status(201).json({ success: true, row });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete('/expenditures/:id', async (req, res) => {
+  try {
+    const isAdmin = ['admin', 'manager', 'superadmin'].includes(req.session.user.role);
+    const result = await ExpenditureModel.delete(
+      req.params.id, bid(req),
+      isAdmin ? {} : { cashier_id: req.session.user.id }
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: 'Expenditure not found, or you can only remove your own entries' });
+    res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
