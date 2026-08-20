@@ -68,8 +68,8 @@ function buildNav(role, activePath) {
   const links = [
     { href: '/', label: '🏪 POS', roles: ['admin', 'manager', 'cashier'] },
     { href: '/orders', label: '📋 Orders', roles: ['admin', 'manager', 'cashier'] },
-    { href: '/sold', label: '🧾 Sold', roles: ['admin', 'manager', 'cashier'] },
-    { href: '/expenditure', label: '💸 Expenditure', roles: ['admin', 'manager', 'cashier'] },
+    { href: '/sold', label: '🧾 Sold', roles: ['cashier'] },
+    { href: '/expenditure', label: '💸 Expenditure', roles: ['cashier'] },
     { href: '/reports', label: '📊 Reports', roles: ['admin', 'manager'] },
     { href: '/inventory', label: '📦 Inventory', roles: ['admin', 'manager'] },
   ];
