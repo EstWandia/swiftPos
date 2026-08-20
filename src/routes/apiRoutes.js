@@ -496,13 +496,11 @@ router.post('/customers', async (req, res) => {
 // ── Sold items ─────────────────────────────────────────────────────────
 router.get('/sold-items', async (req, res) => {
   try {
-    const { date_from, date_to, limit, offset, cashier_id, item_id } = req.query;
-    // Cashiers only ever see their own sold items; admins/managers can see
-    // everyone's, or filter down to one cashier via ?cashier_id=
+    const { date_from, date_to, limit, offset, cashier_id, item_id, search } = req.query;
     const scopedCashierId = req.session.user.role === 'cashier'
       ? req.session.user.id
       : (cashier_id ? parseInt(cashier_id) : null);
-    res.json(await SoldItemModel.getAll(bid(req), { date_from, date_to, limit, offset, cashier_id: scopedCashierId, item_id }));
+    res.json(await SoldItemModel.getAll(bid(req), { date_from, date_to, limit, offset, cashier_id: scopedCashierId, item_id, search }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

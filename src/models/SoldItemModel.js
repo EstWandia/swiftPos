@@ -13,12 +13,13 @@ const SoldItemModel = {
       FROM sold_items ${where}`, p);
     return row;
   },
-  async getAll(business_id, { item_id, cashier_id, date_from, date_to, limit = 100, offset = 0 } = {}) {
+  async getAll(business_id, { item_id, cashier_id, date_from, date_to, search, limit = 100, offset = 0 } = {}) {
     let where = 'WHERE business_id=?'; const p = [business_id];
     if (item_id) { where += ' AND item_id=?'; p.push(item_id); }
     if (cashier_id) { where += ' AND cashier_id=?'; p.push(cashier_id); }
     if (date_from) { where += ' AND DATE(sold_at)>=?'; p.push(date_from); }
     if (date_to) { where += ' AND DATE(sold_at)<=?'; p.push(date_to); }
+    if (search) { where += ' AND (item_name LIKE ? OR item_sku LIKE ?)'; p.push(`%${search}%`, `%${search}%`); }
     const rows = await query(`SELECT * FROM sold_items ${where} ORDER BY sold_at DESC LIMIT ? OFFSET ?`, [...p, parseInt(limit), parseInt(offset)]);
     const total = await queryOne(`SELECT COUNT(*) AS n FROM sold_items ${where}`, p);
     return { rows, total: total?.n || 0 };

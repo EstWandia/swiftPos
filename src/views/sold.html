@@ -392,16 +392,13 @@
             const search = document.getElementById('fSearch').value.trim();
 
             let url = `/api/sold-items?limit=${LIMIT}&offset=${page * LIMIT}&date_from=${df}&date_to=${dt}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
 
             document.getElementById('soldBody').innerHTML = '<tr><td colspan="11"><div class="spinner"></div></td></tr>';
             document.getElementById('soldCards').innerHTML = '';
 
             try {
-                let { rows, total } = await API.get(url);
-                if (search) {
-                    const s = search.toLowerCase();
-                    rows = rows.filter(r => r.item_name.toLowerCase().includes(s) || (r.item_sku || '').toLowerCase().includes(s));
-                }
+                const { rows, total } = await API.get(url);
                 totalRows = total;
                 renderTable(rows);
                 renderPg();
